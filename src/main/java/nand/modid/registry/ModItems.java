@@ -13,16 +13,31 @@ public class ModItems {
 
     // 아이템 인스턴스 생성
     public static final Item DROP_TOOL = new drop_tool(new Item.Settings());
+    public static final Item START_TOOL = new start_tool(new Item.Settings());
+    public static final Item MOVE_TOOL = new move_tool(new Item.Settings());
+
     public static void register() {
         Registry.register(
                 Registries.ITEM,
                 Identifier.of(StasisChess.MOD_ID, "drop_tool"),
                 DROP_TOOL
         );
+        Registry.register(
+                Registries.ITEM,
+                Identifier.of(StasisChess.MOD_ID, "start_tool"),
+                START_TOOL
+        );
+        Registry.register(
+                Registries.ITEM,
+                Identifier.of(StasisChess.MOD_ID, "move_tool"),
+                MOVE_TOOL
+        );
 
         // 아이템 그룹에 추가
         ItemGroupEvents.modifyEntriesEvent(ItemGroups.COMBAT).register(content -> {
             content.add(DROP_TOOL);
+            content.add(START_TOOL);
+            content.add(MOVE_TOOL);
         });
     }
 }
