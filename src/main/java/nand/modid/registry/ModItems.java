@@ -38,6 +38,11 @@ public class ModItems {
                 Identifier.of(StasisChess.MOD_ID, "turn_tool"),
                 TURN_TOOL
         );
+        Registry.register(
+                Registries.ITEM,
+                Identifier.of(StasisChess.MOD_ID, "start_exp_tool"),
+                new start_exp_tool(new Item.Settings())
+        );
 
         // 아이템 그룹에 추가
         ItemGroupEvents.modifyEntriesEvent(ItemGroups.COMBAT).register(content -> {

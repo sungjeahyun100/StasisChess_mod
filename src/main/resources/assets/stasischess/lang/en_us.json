@@ -2,5 +2,6 @@
   "item.stasischess.start_tool": "Start Tool",
   "item.stasischess.drop_tool": "Drop Tool",
   "item.stasischess.move_tool": "Move Tool",
-  "item.stasischess.turn_tool": "Turn Tool"
+  "item.stasischess.turn_tool": "Turn Tool",
+  "item.stasischess.start_exp_tool": "Start Experimental Tool"
 }

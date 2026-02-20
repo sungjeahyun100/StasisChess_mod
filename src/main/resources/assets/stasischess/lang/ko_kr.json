@@ -2,5 +2,6 @@
   "item.stasischess.start_tool": "시작 도구",
   "item.stasischess.drop_tool": "드롭 도구",
   "item.stasischess.move_tool": "이동 도구",
-  "item.stasischess.turn_tool": "턴 도구"
+  "item.stasischess.turn_tool": "턴 도구",
+  "item.stasischess.start_exp_tool": "실험용 게임 시작 도구"
 }

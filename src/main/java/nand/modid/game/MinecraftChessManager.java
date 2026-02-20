@@ -52,6 +52,9 @@ public class MinecraftChessManager {
     private int[] selectedSquare = null;
     private int selectedPocketIndex = -1;
 
+    /** 포켓 한 줄당 최대 슬롯 수 (보드 가로 = 8칸) */
+    private static final int POCKET_COLS = 8;
+
     private MinecraftChessManager() {
         this.engine = new ChessStackEngine();
     }
@@ -68,6 +71,17 @@ public class MinecraftChessManager {
         this.selectedPocketIndex = -1;
         
         player.sendMessage(Text.literal("§aNew Game Started!"), false);
+        syncAllPieces(player.getServerWorld());
+    }
+
+    public void startExperimentalGame(BlockPos origin, ServerPlayerEntity player) {
+        this.boardOrigin = origin;
+        this.activeGameId = engine.createExperimentalGame();
+
+        this.selectedSquare = null;
+        this.selectedPocketIndex = -1;
+
+        player.sendMessage(Text.literal("§d§lExperimental Game Started! (실험용 포켓)"), false);
         syncAllPieces(player.getServerWorld());
     }
 
@@ -246,37 +260,38 @@ public class MinecraftChessManager {
         if (activeGameId == null || boardOrigin == null) return;
 
         double y = boardOrigin.getY() + 1.0;
-        // player: 0=백(남쪽), 1=흑(북쪽)
-        int[]    zOffsets = { -2, 17 };
-        String[] titles   = { "§f§lWHITE POCKET", "§7§lBLACK POCKET" };
+        String[] titles = { "§f§lWHITE POCKET", "§7§lBLACK POCKET" };
 
         for (int player = 0; player < 2; player++) {
-            double pocketZ = boardOrigin.getZ() + zOffsets[player];
             boolean isWhite = (player == 0);
             List<UUID> playerUuids = pocketEntities.computeIfAbsent(player, k -> new ArrayList<>());
 
-            // 제목 텍스트
+            // 제목 텍스트 (항상 0번 줄 기준)
             DisplayEntity.TextDisplayEntity titleDisplay =
                 new DisplayEntity.TextDisplayEntity(EntityType.TEXT_DISPLAY, world);
             titleDisplay.addCommandTag("sc_pocket");
             titleDisplay.addCommandTag("sc_game_" + activeGameId);
             titleDisplay.refreshPositionAndAngles(
-                boardOrigin.getX() - 2.0, y + 1.5, pocketZ, 0, 0);
+                boardOrigin.getX() - 2.0, y + 1.5, getPocketZ(player, 0), 0, 0);
             titleDisplay.setText(Text.literal(titles[player]));
             titleDisplay.setBillboardMode(DisplayEntity.BillboardMode.CENTER);
             world.spawnEntity(titleDisplay);
             playerUuids.add(titleDisplay.getUuid());
 
-            // 포켓 내 기물 종류별 블록+카운트 텍스트
+            // 포켓 내 기물 종류별 블록+카운트 텍스트 (줄바꿈 지원)
             Map<Piece.PieceKind, Integer> counts = getGroupedPocket(player);
-            int slot = 0;
-            // 현재 플레이어의 포켓에만 선택 표시 적용
+            List<Map.Entry<Piece.PieceKind, Integer>> entries = new ArrayList<>(counts.entrySet());
             int currentPlayer = (activeGameId != null) ? engine.getCurrentPlayer(activeGameId) : -1;
             boolean isCurrentPlayer = (player == currentPlayer);
-            for (Map.Entry<Piece.PieceKind, Integer> entry : counts.entrySet()) {
-                Piece.PieceKind kind = entry.getKey();
-                int count = entry.getValue();
-                double slotX = boardOrigin.getX() + slot * 2.0 + 1.0;
+
+            for (int slot = 0; slot < entries.size(); slot++) {
+                int row = slot / POCKET_COLS;
+                int col = slot % POCKET_COLS;
+                Piece.PieceKind kind = entries.get(slot).getKey();
+                int count = entries.get(slot).getValue();
+
+                double slotX = boardOrigin.getX() + col * 2.0 + 1.0;
+                double pocketZ = getPocketZ(player, row);
                 boolean isSelected = isCurrentPlayer && (slot == selectedPocketIndex);
 
                 // 블록 디스플레이
@@ -284,7 +299,6 @@ public class MinecraftChessManager {
                     new DisplayEntity.BlockDisplayEntity(EntityType.BLOCK_DISPLAY, world);
                 blockDisplay.addCommandTag("sc_pocket");
                 blockDisplay.addCommandTag("sc_game_" + activeGameId);
-                // 선택된 슬롯은 살짝 위로 띄워 강조
                 double blockY = isSelected ? y + 0.3 : y;
                 blockDisplay.refreshPositionAndAngles(slotX - 0.5, blockY, pocketZ - 0.5, 0, 0);
                 blockDisplay.setBlockState(getPieceBlockForKind(kind, isWhite));
@@ -303,10 +317,18 @@ public class MinecraftChessManager {
                 countDisplay.setBillboardMode(DisplayEntity.BillboardMode.CENTER);
                 world.spawnEntity(countDisplay);
                 playerUuids.add(countDisplay.getUuid());
-
-                slot++;
             }
         }
+    }
+
+    /**
+     * 포켓 표시 Z 좌표: 백(player=0)은 보드 남쪽으로, 흑(player=1)은 보드 북쪽으로 줄마다 2블록씩 확장.
+     * row 0 → 백 dz=-2 / 흑 dz=+17, row 1 → 백 dz=-4 / 흑 dz=+19, ...
+     */
+    private double getPocketZ(int player, int row) {
+        return player == 0
+            ? boardOrigin.getZ() - 2 - row * 2   // 백: 남쪽으로
+            : boardOrigin.getZ() + 17 + row * 2; // 흑: 북쪽으로
     }
 
     private Map<Piece.PieceKind, Integer> getGroupedPocket(int player) {
@@ -343,7 +365,8 @@ public class MinecraftChessManager {
 
     /**
      * drop_tool로 포켓 표시 영역을 클릭했을 때 해당 슬롯의 기물을 선택한다.
-     * 백 포켓: dz ∈ [-3, -1], 흑 포켓: dz ∈ [16, 18]
+     * 백 포켓: dz ≤ -1 (줄마다 2블록씩 남쪽으로 확장)
+     * 흑 포켓: dz ≥ 16 (줄마다 2블록씩 북쪽으로 확장)
      *
      * @return 포켓 영역 클릭이면 true (처리됨), 아니면 false (보드 클릭으로 처리 위임)
      */
@@ -353,21 +376,29 @@ public class MinecraftChessManager {
         int dx = clickedPos.getX() - boardOrigin.getX();
         int dz = clickedPos.getZ() - boardOrigin.getZ();
 
-        // 포켓 영역 판별
-        boolean isWhitePocket = dz >= -3 && dz <= -1;
-        boolean isBlackPocket = dz >= 16 && dz <= 18;
-        if (!isWhitePocket && !isBlackPocket) return false;
+        // 포켓 영역 판별 및 줄(row) 계산
+        // 백: dz=-1,-2 → row 0 / dz=-3,-4 → row 1 / ...
+        // 흑: dz=16,17 → row 0 / dz=18,19 → row 1 / ...
+        int clickedPlayer;
+        int row;
+        if (dz <= -1) {
+            clickedPlayer = 0;
+            row = (-dz - 1) / 2;
+        } else if (dz >= 16) {
+            clickedPlayer = 1;
+            row = (dz - 16) / 2;
+        } else {
+            return false;
+        }
+
         if (dx < 0 || dx >= 16) return false;
 
-        int clickedPlayer = isWhitePocket ? 0 : 1;
         int currentPlayer = engine.getCurrentPlayer(activeGameId);
-
         if (clickedPlayer != currentPlayer) {
             player.sendMessage(Text.literal("§cNot your turn!"), false);
             return true;
         }
 
-        int slot = dx / 2;
         Map<Piece.PieceKind, Integer> counts = getGroupedPocket(currentPlayer);
         List<Piece.PieceKind> uniqueKinds = new ArrayList<>(counts.keySet());
 
@@ -375,8 +406,12 @@ public class MinecraftChessManager {
             player.sendMessage(Text.literal("§cPocket is empty!"), false);
             return true;
         }
+
+        int col = dx / 2;
+        int slot = row * POCKET_COLS + col;
+
         if (slot >= uniqueKinds.size()) {
-            // 슬롯에 기물이 없으면 선택 해제
+            // 해당 슬롯에 기물이 없으면 선택 해제
             selectedPocketIndex = -1;
             player.sendMessage(Text.literal("§7Pocket Selection: None"), false);
             syncPocketDisplays(player.getServerWorld());
