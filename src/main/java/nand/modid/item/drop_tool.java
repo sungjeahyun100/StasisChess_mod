@@ -6,8 +6,6 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemUsageContext;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
@@ -26,18 +24,13 @@ public class drop_tool extends Item {
             if (player.isSneaking()) {
                 MinecraftChessManager.getInstance().endTurn(player);
             } else {
-                MinecraftChessManager.getInstance().handlePlaceInteraction(pos, player);
+                // 포켓 영역 클릭 → 기물 선택
+                // 보드 영역 클릭 → 선택된 기물을 착수
+                if (!MinecraftChessManager.getInstance().handlePocketClick(pos, player)) {
+                    MinecraftChessManager.getInstance().handlePlaceInteraction(pos, player);
+                }
             }
         }
         return ActionResult.success(world.isClient);
-    }
-
-    @Override
-    public TypedActionResult<net.minecraft.item.ItemStack> use(World world, PlayerEntity user, Hand hand) {
-        if (!world.isClient && user.isSneaking()) {
-            MinecraftChessManager.getInstance().cyclePocketSelection((ServerPlayerEntity) user);
-            return TypedActionResult.success(user.getStackInHand(hand));
-        }
-        return super.use(world, user, hand);
     }
 }
