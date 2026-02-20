@@ -43,6 +43,8 @@ public class MinecraftChessManager {
     private final Map<String, Map<String, List<UUID>>> pieceEntities = new HashMap<>();
     private final Map<String, MoveAnimation> activeAnimations = new HashMap<>();
     private UUID statusEntity;
+    // 포켓 표시 엔티티: 플레이어(0=백, 1=흑) -> 디스플레이 엔티티 UUID 목록
+    private final Map<Integer, List<UUID>> pocketEntities = new HashMap<>();
     
     private int[] selectedSquare = null;
     private int selectedPocketIndex = -1;
@@ -86,6 +88,15 @@ public class MinecraftChessManager {
             }
         }
         pieceEntities.clear();
+
+        // 포켓 표시 엔티티 정리
+        for (List<UUID> uuids : pocketEntities.values()) {
+            for (UUID uuid : uuids) {
+                Entity e = world.getEntity(uuid);
+                if (e != null) e.discard();
+            }
+        }
+        pocketEntities.clear();
         
         if (statusEntity != null) {
             Entity e = world.getEntity(statusEntity);
@@ -96,6 +107,7 @@ public class MinecraftChessManager {
 
     private void syncAllPieces(ServerWorld world) {
         updateStatusEntity(world);
+        syncPocketDisplays(world);
         if (activeGameId == null) return;
         
         List<Piece.PieceData> boardPieces = engine.getBoardPieces(activeGameId);
@@ -197,8 +209,11 @@ public class MinecraftChessManager {
     }
 
     private BlockState getPieceBlock(Piece.PieceData p) {
-        boolean isWhite = p.owner == 0;
-        return switch (p.effectiveKind()) {
+        return getPieceBlockForKind(p.effectiveKind(), p.owner == 0);
+    }
+
+    private BlockState getPieceBlockForKind(Piece.PieceKind kind, boolean isWhite) {
+        return switch (kind) {
             case KING -> (isWhite ? Blocks.GOLD_BLOCK : Blocks.NETHERITE_BLOCK).getDefaultState();
             case QUEEN -> (isWhite ? Blocks.DIAMOND_BLOCK : Blocks.CRYING_OBSIDIAN).getDefaultState();
             case ROOK -> (isWhite ? Blocks.IRON_BLOCK : Blocks.OBSIDIAN).getDefaultState();
@@ -209,6 +224,86 @@ public class MinecraftChessManager {
             case CANNON -> Blocks.TNT.getDefaultState();
             default -> (isWhite ? Blocks.SNOW_BLOCK : Blocks.GRAY_CONCRETE).getDefaultState();
         };
+    }
+
+    /**
+     * 게임 시작/매 수마다 양옆에 포켓 표시를 갱신한다.
+     * 백 포켓: 보드 남쪽(z-2), 흑 포켓: 보드 북쪽(z+17)
+     */
+    private void syncPocketDisplays(ServerWorld world) {
+        // 기존 포켓 엔티티 제거
+        for (List<UUID> uuids : pocketEntities.values()) {
+            for (UUID uuid : uuids) {
+                Entity e = world.getEntity(uuid);
+                if (e != null) e.discard();
+            }
+        }
+        pocketEntities.clear();
+
+        if (activeGameId == null || boardOrigin == null) return;
+
+        double y = boardOrigin.getY() + 1.0;
+        // player: 0=백(남쪽), 1=흑(북쪽)
+        int[]    zOffsets = { -2, 17 };
+        String[] titles   = { "§f§lWHITE POCKET", "§7§lBLACK POCKET" };
+
+        for (int player = 0; player < 2; player++) {
+            double pocketZ = boardOrigin.getZ() + zOffsets[player];
+            boolean isWhite = (player == 0);
+            List<UUID> playerUuids = pocketEntities.computeIfAbsent(player, k -> new ArrayList<>());
+
+            // 제목 텍스트
+            DisplayEntity.TextDisplayEntity titleDisplay =
+                new DisplayEntity.TextDisplayEntity(EntityType.TEXT_DISPLAY, world);
+            titleDisplay.addCommandTag("sc_pocket");
+            titleDisplay.addCommandTag("sc_game_" + activeGameId);
+            titleDisplay.refreshPositionAndAngles(
+                boardOrigin.getX() - 2.0, y + 1.5, pocketZ, 0, 0);
+            titleDisplay.setText(Text.literal(titles[player]));
+            titleDisplay.setBillboardMode(DisplayEntity.BillboardMode.CENTER);
+            world.spawnEntity(titleDisplay);
+            playerUuids.add(titleDisplay.getUuid());
+
+            // 포켓 내 기물 종류별 블록+카운트 텍스트
+            Map<Piece.PieceKind, Integer> counts = getGroupedPocket(player);
+            int slot = 0;
+            // 현재 플레이어의 포켓에만 선택 표시 적용
+            int currentPlayer = (activeGameId != null) ? engine.getCurrentPlayer(activeGameId) : -1;
+            boolean isCurrentPlayer = (player == currentPlayer);
+            for (Map.Entry<Piece.PieceKind, Integer> entry : counts.entrySet()) {
+                Piece.PieceKind kind = entry.getKey();
+                int count = entry.getValue();
+                double slotX = boardOrigin.getX() + slot * 2.0 + 1.0;
+                boolean isSelected = isCurrentPlayer && (slot == selectedPocketIndex);
+
+                // 블록 디스플레이
+                DisplayEntity.BlockDisplayEntity blockDisplay =
+                    new DisplayEntity.BlockDisplayEntity(EntityType.BLOCK_DISPLAY, world);
+                blockDisplay.addCommandTag("sc_pocket");
+                blockDisplay.addCommandTag("sc_game_" + activeGameId);
+                // 선택된 슬롯은 살짝 위로 띄워 강조
+                double blockY = isSelected ? y + 0.3 : y;
+                blockDisplay.refreshPositionAndAngles(slotX - 0.5, blockY, pocketZ - 0.5, 0, 0);
+                blockDisplay.setBlockState(getPieceBlockForKind(kind, isWhite));
+                world.spawnEntity(blockDisplay);
+                playerUuids.add(blockDisplay.getUuid());
+
+                // 수량 텍스트 (선택 시 황금색 강조)
+                DisplayEntity.TextDisplayEntity countDisplay =
+                    new DisplayEntity.TextDisplayEntity(EntityType.TEXT_DISPLAY, world);
+                countDisplay.addCommandTag("sc_pocket");
+                countDisplay.addCommandTag("sc_game_" + activeGameId);
+                countDisplay.refreshPositionAndAngles(slotX, blockY + 1.3, pocketZ, 0, 0);
+                String color = isSelected ? "§6§l" : (isWhite ? "§f" : "§7");
+                String label = color + kind.name() + " ×" + count + (isSelected ? " §e◀" : "");
+                countDisplay.setText(Text.literal(label));
+                countDisplay.setBillboardMode(DisplayEntity.BillboardMode.CENTER);
+                world.spawnEntity(countDisplay);
+                playerUuids.add(countDisplay.getUuid());
+
+                slot++;
+            }
+        }
     }
 
     private Map<Piece.PieceKind, Integer> getGroupedPocket(int player) {
@@ -241,6 +336,60 @@ public class MinecraftChessManager {
             int count = counts.get(kind);
             player.sendMessage(Text.literal("§ePocket Selection: §l" + kind.name() + " §r(x" + count + ") (" + (selectedPocketIndex + 1) + "/" + uniqueKinds.size() + ")"), false);
         }
+    }
+
+    /**
+     * drop_tool로 포켓 표시 영역을 클릭했을 때 해당 슬롯의 기물을 선택한다.
+     * 백 포켓: dz ∈ [-3, -1], 흑 포켓: dz ∈ [16, 18]
+     *
+     * @return 포켓 영역 클릭이면 true (처리됨), 아니면 false (보드 클릭으로 처리 위임)
+     */
+    public boolean handlePocketClick(BlockPos clickedPos, ServerPlayerEntity player) {
+        if (activeGameId == null || boardOrigin == null) return false;
+
+        int dx = clickedPos.getX() - boardOrigin.getX();
+        int dz = clickedPos.getZ() - boardOrigin.getZ();
+
+        // 포켓 영역 판별
+        boolean isWhitePocket = dz >= -3 && dz <= -1;
+        boolean isBlackPocket = dz >= 16 && dz <= 18;
+        if (!isWhitePocket && !isBlackPocket) return false;
+        if (dx < 0 || dx >= 16) return false;
+
+        int clickedPlayer = isWhitePocket ? 0 : 1;
+        int currentPlayer = engine.getCurrentPlayer(activeGameId);
+
+        if (clickedPlayer != currentPlayer) {
+            player.sendMessage(Text.literal("§cNot your turn!"), false);
+            return true;
+        }
+
+        int slot = dx / 2;
+        Map<Piece.PieceKind, Integer> counts = getGroupedPocket(currentPlayer);
+        List<Piece.PieceKind> uniqueKinds = new ArrayList<>(counts.keySet());
+
+        if (uniqueKinds.isEmpty()) {
+            player.sendMessage(Text.literal("§cPocket is empty!"), false);
+            return true;
+        }
+        if (slot >= uniqueKinds.size()) {
+            // 슬롯에 기물이 없으면 선택 해제
+            selectedPocketIndex = -1;
+            player.sendMessage(Text.literal("§7Pocket Selection: None"), false);
+            syncPocketDisplays(player.getServerWorld());
+            return true;
+        }
+
+        selectedPocketIndex = slot;
+        Piece.PieceKind kind = uniqueKinds.get(slot);
+        int count = counts.get(kind);
+        player.sendMessage(Text.literal(
+            "§ePocket Selected: §l" + kind.name() + " §r(×" + count + ") ["
+            + (slot + 1) + "/" + uniqueKinds.size() + "] — 보드를 클릭해 착수"), false);
+
+        // 포켓 디스플레이 갱신 (선택 표시)
+        syncPocketDisplays(player.getServerWorld());
+        return true;
     }
 
     public void handlePlaceInteraction(BlockPos clickedPos, ServerPlayerEntity player) {
