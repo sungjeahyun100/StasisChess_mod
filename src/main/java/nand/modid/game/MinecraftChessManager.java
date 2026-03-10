@@ -1146,6 +1146,10 @@ public class MinecraftChessManager {
             case BOUNCING_BISHOP -> "Bb";
             case EXPERIMENT -> "Ex";
             case CUSTOM -> "Cu";
+            // 중립기물 — 회색 약어 사용
+            case NEUTRAL_SENTINEL -> "nSe";
+            case NEUTRAL_PYLON    -> "nPy";
+            case NEUTRAL_WANDERER -> "nWa";
         };
     }
 

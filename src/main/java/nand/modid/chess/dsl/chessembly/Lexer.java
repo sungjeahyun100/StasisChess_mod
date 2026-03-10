@@ -172,6 +172,9 @@ public final class Lexer {
             case "transition":
                 if (args.size() >= 1) return new AST.Token(AST.TokenType.TRANSITION, args.get(0));
                 return new AST.Token(AST.TokenType.END);
+            //스택 관련 식
+            case "use-move-stack": return new AST.Token(AST.TokenType.USE_MOVE_STACK);
+            case "if-move-stack": p = xy(args); return new AST.Token(AST.TokenType.IF_MOVE_STACK, p[0], p[1]);
             // 제어
             case "repeat":
                 return new AST.Token(AST.TokenType.REPEAT, 0, 0, null,

@@ -2,6 +2,8 @@ package nand.modid.chess.dsl.chessembly;
 
 import java.util.*;
 
+import nand.modid.chess.core.Move;
+
 /**
  * AST — Chessembly DSL의 모든 토큰 타입, 액션 태그, 활성화 정보를 정의한다.
  */
@@ -22,7 +24,8 @@ public final class AST {
     // ── ActionTagType ─────────────────────────────────
     public enum ActionTagType {
         TRANSITION, // 기물 변환
-        SET_STATE   // 전역 상태 설정
+        SET_STATE,   // 전역 상태 설정
+        USEING_STACK // 
     }
 
     // ── ActionTag ─────────────────────────────────────
@@ -31,12 +34,14 @@ public final class AST {
         public final String key;
         public final int value;
         public final String pieceName; // nullable
+        public final Move.Square where_stack_is_comming;
 
-        public ActionTag(ActionTagType tagType, String key, int value, String pieceName) {
+        public ActionTag(ActionTagType tagType, String key, int value, String pieceName, Move.Square Sq) {
             this.tagType = tagType;
             this.key = key;
             this.value = value;
             this.pieceName = pieceName;
+            this.where_stack_is_comming = Sq;
         }
 
         @Override
@@ -93,7 +98,9 @@ public final class AST {
         BOUND, EDGE, EDGE_TOP, EDGE_BOTTOM, EDGE_LEFT, EDGE_RIGHT,
         CORNER, CORNER_TOP_LEFT, CORNER_TOP_RIGHT, CORNER_BOTTOM_LEFT, CORNER_BOTTOM_RIGHT,
         // 상태
-        PIECE, IF_STATE, SET_STATE, SET_STATE_RESET, TRANSITION,
+        PIECE, IF_STATE, SET_STATE, SET_STATE_RESET, TRANSITION, 
+        //스택 관련
+        USE_MOVE_STACK, IF_MOVE_STACK,
         // 제어
         REPEAT, DO, WHILE, JMP, JNE, LABEL, NOT, END,
         // 구조

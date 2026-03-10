@@ -35,7 +35,9 @@ public final class MoveGenerator {
         if (board == null) return legalMoves;
 
         // 행마법 스크립트 결정
-        String script = piece.effectiveKind().chessemblyScript(piece.isWhite());
+        // 중립기물은 현재 플레이어(turn)의 색 관점에서 방향을 결정한다 (예: 폰 방향)
+        boolean isWhiteForScript = piece.isNeutral() ? (state.getTurn() == 0) : piece.isWhite();
+        String script = piece.effectiveKind().chessemblyScript(isWhiteForScript);
 
         // 인터프리터 실행
         Interpreter interpreter = new Interpreter();

@@ -14,10 +14,14 @@ public final class BuiltinOps {
     public static final class PieceInfo {
         public final String name;
         public final boolean isWhite;
+        public final int stun_stack;
+        public final int move_stack;
 
-        public PieceInfo(String name, boolean isWhite) {
+        public PieceInfo(String name, boolean isWhite, int st, int mo) {
             this.name = name;
             this.isWhite = isWhite;
+            this.stun_stack = st;
+            this.move_stack = mo;
         }
     }
 
@@ -52,8 +56,8 @@ public final class BuiltinOps {
             return ((long) x << 32) | (y & 0xFFFFFFFFL);
         }
 
-        public void putPiece(int x, int y, String name, boolean white) {
-            pieces.put(key(x, y), new PieceInfo(name, white));
+        public void putPiece(int x, int y, String name, boolean white, int stun, int move) {
+            pieces.put(key(x, y), new PieceInfo(name, white, stun, move));
         }
 
         public boolean inBounds(int x, int y) {

@@ -2,6 +2,8 @@ package nand.modid.chess.dsl.chessembly;
 
 import java.util.*;
 import java.util.function.Consumer;
+import nand.modid.chess.core.Move;
+import nand.modid.chess.core.Move.Square;
 
 /**
  * Interpreter — Chessembly 토큰 리스트를 실행하여 Activation 목록을 생성한다.
@@ -49,6 +51,9 @@ public final class Interpreter {
         // ── 라벨 사전 처리: 체인 인덱스 → (라벨명 → pc) ──
         Map<Integer, Map<String, Integer>> labels = new HashMap<>();
         {
+            if(debug){
+                log(String.format("[interpreter] label index preprocessing..."));
+            }
             int chainIdx = 0;
             int i = 0;
             while (i < tokens.size()) {
@@ -60,6 +65,9 @@ public final class Interpreter {
                     labels.computeIfAbsent(chainIdx, k -> new HashMap<>())
                           .put(t.strArg, i);
                 }
+            }
+            if(debug){
+                log(String.format("[interpreter] done."));
             }
         }
 
@@ -83,6 +91,8 @@ public final class Interpreter {
 
         // 마지막 take 위치 (jump용)
         int[] lastTakePos = null; // [dx, dy]
+
+        Square isMoveStackUsable = new Square(0, 0); //if-move-stack전용 필드.
 
         while (pc < tokens.size()) {
             AST.Token token = tokens.get(pc);
@@ -434,7 +444,7 @@ public final class Interpreter {
 
                 case SET_STATE: {
                     pendingTags.add(new AST.ActionTag(
-                            AST.ActionTagType.SET_STATE, token.strArg, token.intArg, null));
+                            AST.ActionTagType.SET_STATE, token.strArg, token.intArg, null, Move.Square.fromNotation(null)));
                     lastValue = true;
                     break;
                 }
@@ -447,7 +457,36 @@ public final class Interpreter {
 
                 case TRANSITION: {
                     pendingTags.add(new AST.ActionTag(
-                            AST.ActionTagType.TRANSITION, "", 0, token.strArg));
+                            AST.ActionTagType.TRANSITION, "", 0, token.strArg, Move.Square.fromNotation(null)));
+                    lastValue = true;
+                    break;
+                }
+                // ── 스택 관련 ──────────────────────────────
+
+                case IF_MOVE_STACK: {
+                    int tx = board.pieceX + anchorX + token.dx;
+                    int ty = board.pieceY + anchorY + token.dy;
+                    if (board.hasEnemy(tx, ty) || board.hasEnemy(tx, ty)){
+                        lastValue = false;
+                        break;
+                    }
+                    if (board.hasFriendly(tx, ty)){
+                        if(board.pieces.get(board.key(tx, ty)).move_stack > 0){
+                            isMoveStackUsable = new Square(tx, ty);
+                            lastValue = true;
+                            break;
+                        }
+                        lastValue = false;
+                        break;
+                    }
+                }
+
+                case USE_MOVE_STACK: {
+                    if (isMoveStackUsable == new Square(0, 0)){
+                        lastValue = false;
+                        break;
+                    }
+                    pendingTags.add(new AST.ActionTag(AST.ActionTagType.USEING_STACK, "", 0, "", isMoveStackUsable));
                     lastValue = true;
                     break;
                 }

@@ -68,6 +68,43 @@ public final class GameState {
         return new Piece.PieceData(id, kind, owner);
     }
 
+    /**
+     * 중립기물(gray piece)을 보드에 직접 배치한다.
+     * 중립기물은 포켓에 넣을 수 없으므로 이 메서드를 통해서만 생성된다.
+     *
+     * <p>배치할 {@code kind}는 반드시 {@link Piece.PieceKind#isNeutral()} == true 이어야 한다.
+     * 능동형/수동형 여부는 {@link Piece.PieceKind#neutralPassive()} 에서 읽는다.
+     * 즉, 중립기물의 성격은 PieceKind 정의 시점에 이미 결정되어 있어야 한다.</p>
+     *
+     * @param kind    중립기물로 선언된 PieceKind (kind.isNeutral() == true 이어야 함)
+     * @param target  배치할 좌표
+     * @return 생성된 기물 ID
+     * @throws IllegalArgumentException kind 가 중립기물로 선언되지 않은 경우
+     * @throws IllegalStateException    해당 칸에 이미 기물이 있는 경우
+     */
+    public String placeNeutralPiece(Piece.PieceKind kind, Move.Square target) {
+        if (!kind.isNeutral()) {
+            throw new IllegalArgumentException(
+                kind.scriptName() + " 은(는) 중립기물로 선언되지 않았습니다. " +
+                "PieceKind 정의 시 isNeutral=true 로 선언하세요.");
+        }
+        if (board.contains(target)) {
+            throw new IllegalStateException("해당 칸에 이미 기물이 있습니다");
+        }
+        // owner = -1 : 중립 소유권 없음
+        String id = "piece_" + nextPieceId++;
+        Piece.PieceData piece = new Piece.PieceData(id, kind, -1);
+        piece.spec = new Piece.PieceSpec(kind);
+        piece.pos = target;
+        piece.stun = 0;
+        // 능동형/수동형은 kind.neutralPassive() 로 결정된다
+        piece.moveStack = kind.neutralPassive() ? 0 : RuleSet.initialMoveStack(piece.score());
+
+        pieces.put(id, piece);
+        board.put(target, id);
+        return id;
+    }
+
     // ── 포켓 ──────────────────────────────────────────
 
     /** 초기 포지션 설정 (킹 + 기본 포켓) */
@@ -270,7 +307,9 @@ public final class GameState {
 
         Piece.PieceData piece = pieces.get(pieceId);
         if (piece == null) throw new IllegalStateException("기물을 찾을 수 없습니다");
-        if (piece.owner != player) throw new IllegalStateException("자신의 기물이 아닙니다");
+        // 중립기물은 어느 플레이어도 사용 가능하다
+        if (!piece.isNeutral() && piece.owner != player)
+            throw new IllegalStateException("자신의 기물이 아닙니다");
 
         if (!piece.canMove()) {
             if (piece.stun > 0)
@@ -284,8 +323,14 @@ public final class GameState {
         if (targetPid != null) {
             Piece.PieceData tp = pieces.get(targetPid);
             if (tp != null) {
-                hasEnemy = tp.owner != player;
-                hasFriendly = tp.owner == player;
+                if (tp.isNeutral()) {
+                    // 중립기물은 어느 플레이어에게도 아군으로 취급된다 (포획 불가, Shift 가능)
+                    hasEnemy = false;
+                    hasFriendly = true;
+                } else {
+                    hasEnemy = tp.owner != player;
+                    hasFriendly = tp.owner == player;
+                }
             }
         }
 
@@ -327,13 +372,14 @@ public final class GameState {
         canMovePiece(piece.owner, pieceId, from, to, mv.moveType);
 
         String capturedId = null;
+        boolean isPassiveNeutral = (piece.isNeutral() && piece.neutralPassive());
 
         switch (mv.moveType) {
             case MOVE: {
                 board.remove(from);
                 board.put(to, pieceId);
                 piece.pos = to;
-                piece.moveStack--;
+                if(!isPassiveNeutral) piece.moveStack--;
                 break;
             }
             case TAKE:
@@ -346,7 +392,7 @@ public final class GameState {
                 board.remove(from);
                 board.put(to, pieceId);
                 piece.pos = to;
-                if (capturedId == null) piece.moveStack--;
+                if (capturedId == null && !isPassiveNeutral) piece.moveStack--;
                 break;
             }
             case CATCH: {
@@ -364,7 +410,7 @@ public final class GameState {
                 board.put(from, targetPid);
                 board.put(to, pieceId);
                 piece.pos = to;
-                piece.moveStack--;
+                if(!isPassiveNeutral) piece.moveStack--;
                 Piece.PieceData tp = pieces.get(targetPid);
                 if (tp != null) tp.pos = from;
                 break;
@@ -373,7 +419,7 @@ public final class GameState {
                 board.remove(from);
                 board.put(to, pieceId);
                 piece.pos = to;
-                piece.moveStack--;
+                if(!isPassiveNeutral) piece.moveStack--;
 
                 if (mv.catchTo != null && mv.catchTo.isValid()) {
                     String victimId = board.get(mv.catchTo);
@@ -399,6 +445,15 @@ public final class GameState {
         if (victim == null) throw new IllegalStateException("피해자를 찾을 수 없습니다");
 
         Piece.PieceData attacker = pieces.get(attackerId);
+
+        //중립-수동형 기물의 경우 이동스택은 전이되지 않는다.
+        if (attacker.isNeutral() && attacker.neutralPassive()){
+            attacker.stun += victim.stun; //단, 스턴은 전이됨.
+            if (victim.pos != null) board.remove(victim.pos);
+            pieces.remove(victimId);
+            return;
+        }
+
         if (attacker != null) {
             attacker.moveStack = attacker.moveStack - 1 + victim.moveStack;
             attacker.stun += victim.stun;
@@ -427,6 +482,10 @@ public final class GameState {
                 case SET_STATE:
                     globalState.put(tag.key, tag.value);
                     break;
+                case USEING_STACK:
+                    String actor = board.get(tag.where_stack_is_comming);
+                    Piece.PieceData p = pieces.get(actor);
+                    p.moveStack--;
             }
         }
     }
@@ -466,7 +525,8 @@ public final class GameState {
         Piece.PieceData p = pieces.get(pieceId);
         if (p == null) throw new IllegalStateException("기물을 찾을 수 없습니다");
 
-        boolean isAlly = p.owner == turn;
+        // 중립기물은 어느 플레이어에게나 아군으로 취급 → 아군 스턴 규칙(1~3) 적용
+        boolean isAlly = p.isNeutral() || (p.owner == turn);
         if (isAlly) {
             if (amount < 1 || amount > 3)
                 throw new IllegalArgumentException("아군에게는 1~3 스턴만 부여할 수 있습니다");
@@ -500,8 +560,9 @@ public final class GameState {
 
     public void endTurn() {
         // 현재 턴 기물 스턴 감소
+        // 중립기물은 능동·수동 모두 매 반턴마다 스턴을 감소시킨다
         for (Piece.PieceData p : pieces.values()) {
-            if (p.owner == turn) {
+            if (p.isNeutral() || p.owner == turn) {
                 p.stun = Math.max(p.stun - 1, 0);
             }
         }
@@ -510,8 +571,12 @@ public final class GameState {
         turn = 1 - turn;
 
         // 다음 턴 기물들 이동 스택 초기화
+        // 능동형 중립기물은 매 반턴마다 스택을 초기화한다 (양측 모두 접근 가능)
         for (Piece.PieceData p : pieces.values()) {
-            if (p.owner == turn && p.pos != null) {
+            if (p.pos == null) continue;
+            if (p.owner == turn) {
+                p.moveStack = RuleSet.initialMoveStack(p.score());
+            } else if (p.isNeutral() && !p.neutralPassive()) {
                 p.moveStack = RuleSet.initialMoveStack(p.score());
             }
         }
@@ -543,11 +608,14 @@ public final class GameState {
         Piece.PieceData piece = pieces.get(pieceId);
         if (piece == null || piece.pos == null) return null;
 
+        // 중립기물의 색 관점은 현재 턴 플레이어를 기준으로 결정된다
+        boolean pieceIsWhite = piece.isNeutral() ? (turn == 0) : piece.isWhite();
+
         BuiltinOps.BoardState bs = new BuiltinOps.BoardState(
                 RuleSet.BOARD_WIDTH, RuleSet.BOARD_HEIGHT,
                 piece.pos.x, piece.pos.y,
                 piece.effectiveKind().scriptName(),
-                piece.isWhite()
+                pieceIsWhite
         );
 
         // 보드 위 모든 기물 등록
@@ -555,7 +623,9 @@ public final class GameState {
             Move.Square sq = entry.getKey();
             Piece.PieceData p = pieces.get(entry.getValue());
             if (p != null) {
-                bs.putPiece(sq.x, sq.y, p.effectiveKind().scriptName(), p.isWhite());
+                // 중립기물은 현재 기물(및 현재 플레이어)과 같은 색으로 등록 → 아군 취급
+                boolean pIsWhite = p.isNeutral() ? pieceIsWhite : p.isWhite();
+                bs.putPiece(sq.x, sq.y, p.effectiveKind().scriptName(), pIsWhite, p.stun, p.moveStack);
             }
         }
 
