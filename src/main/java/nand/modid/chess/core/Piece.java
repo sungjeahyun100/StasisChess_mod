@@ -36,45 +36,36 @@ public final class Piece {
         CUSTOM("custom", 3),
 
         // ── 중립기물 (gray piece) ─────────────────────────
-        // 새 중립기물을 만들 때 여기에 (scriptName, score, isNeutral=true, neutralPassive) 로 추가하세요.
+        // 새 중립기물을 만들 때 여기에 (scriptName, score, isNeutral=true) 로 추가하세요.
+        // 이동 가능 여부는 chessemblyScript()가 결정합니다.
+
+        /** 중립기물 예시 — 나이트 행마 + 양측 모두 이동 가능. */
+        NEUTRAL_SENTINEL("neutral_sentinel", 3, true),
+
+        /** 중립기물 예시 — 자체 이동 불가, Shift로만 이동됨 (빈 스크립트). */
+        NEUTRAL_PYLON("neutral_pylon", 5, true),
 
         /**
-         * 능동형 중립기물 예시 — 나이트 행마 + 양측 모두 이동 가능.
-         * isNeutral=true, neutralPassive=false → 자체 이동 스택을 가짐.
-         */
-        NEUTRAL_SENTINEL("neutral_sentinel", 3, true, false),
-
-        /**
-         * 수동형 중립기물 예시 — 룩 행마 + Shift로만 이동됨.
-         * isNeutral=true, neutralPassive=true → 이동 스택 없음; 밀어야 이동.
-         */
-        NEUTRAL_PYLON("neutral_pylon", 5, true, true),
-
-        /**
-         * 능동형 방향 의존 중립기물 예시 — 폰형 전진 행마.
+         * 방향 의존 중립기물 예시 — 폰형 전진 행마.
          * 백 턴에는 +y, 흑 턴에는 -y 방향으로 이동.
-         * isNeutral=true, neutralPassive=false → 자체 이동 스택을 가짐.
          */
-        NEUTRAL_WANDERER("neutral_wanderer", 1, true, false);
+        NEUTRAL_WANDERER("neutral_wanderer", 1, true);
 
         private final String scriptName;
         private final int score;
         /** 이 기물 종류가 설계 시점에 중립기물로 정의되었는지 여부. */
         private final boolean neutral;
-        /** 수동형 중립 여부 (neutral == true 일 때만 유효). */
-        private final boolean passive;
 
         /** 일반 기물용 생성자 (중립 아님). */
         PieceKind(String scriptName, int score) {
-            this(scriptName, score, false, false);
+            this(scriptName, score, false);
         }
 
         /** 중립기물 선언용 생성자. */
-        PieceKind(String scriptName, int score, boolean isNeutral, boolean neutralPassive) {
+        PieceKind(String scriptName, int score, boolean isNeutral) {
             this.scriptName = scriptName;
             this.score = score;
             this.neutral = isNeutral;
-            this.passive = neutralPassive;
         }
 
         public int score() { return score; }
@@ -85,13 +76,6 @@ public final class Piece {
          * true이면 placeNeutralPiece()로만 배치 가능하며 포켓 사용 불가.
          */
         public boolean isNeutral() { return neutral; }
-
-        /**
-         * 수동형 중립기물 여부 (isNeutral() == true 일 때만 유효).
-         * true  → 이동 스택 없음; shift로만 이동.
-         * false → 능동형; 자체 이동 스택을 가짐.
-         */
-        public boolean neutralPassive() { return passive; }
 
         public boolean canPromote() {
             return this == PAWN;
@@ -235,8 +219,8 @@ public final class Piece {
                          + " take-move(-1, 2); take-move(-2, 1); take-move(-2, -1); take-move(-1, -2);";
 
                 case NEUTRAL_PYLON:
-                    //수동형 기물 테스트
-                    return "if-move-stack(0, 1) use-move-stack take-move(0, -1) repeat(1);";
+                    // 자체 이동 불가 — Shift로만 이동됨
+                    return "";
 
                 case NEUTRAL_WANDERER:
                     // 폰형 전진 행마 — 현재 플레이어 색 기준으로 방향 결정
@@ -291,12 +275,6 @@ public final class Piece {
          */
         public boolean isNeutral() { return kind.isNeutral(); }
 
-        /**
-         * 수동형 중립기물 여부 — kind.neutralPassive() 에서 위임.
-         * isNeutral() == true 일 때만 의미 있음.
-         */
-        public boolean neutralPassive() { return kind.neutralPassive(); }
-
         public PieceSpec(PieceKind kind) {
             this.kind = kind;
         }
@@ -346,15 +324,7 @@ public final class Piece {
             return kind.isNeutral();
         }
 
-        /**
-         * 수동형 중립기물 여부 (isNeutral() == true 일 때만 유효).
-         * kind.neutralPassive() 를 직접 확인한다 — PieceKind 정의 시 선언된 속성.
-         * true  → 자체 이동 스택 없음; 다른 기물의 이동 스택을 소모해 움직인다.
-         * false → 능동형; 자체 이동 스택을 갖고 독립적으로 움직인다.
-         */
-        public boolean neutralPassive() {
-            return kind.neutralPassive();
-        }
+
 
         /** 실제 행마에 사용되는 기물 종류 (위장 고려) */
         public PieceKind effectiveKind() {
@@ -364,8 +334,7 @@ public final class Piece {
         public int score() { return kind.score(); }
 
         public boolean canMove() {
-            boolean isNeutralPassive = isNeutral() && neutralPassive();
-            return stun == 0 && moveStack > 0 || isNeutralPassive; //수동형 중립기물일 경우 검사 통과. 이후 행마여부는 chessembly에 맡김.
+            return stun == 0 && moveStack > 0;
         }
 
         /**
@@ -392,9 +361,7 @@ public final class Piece {
 
         @Override
         public String toString() {
-            String neutralTag = isNeutral()
-                    ? (neutralPassive() ? " NEUTRAL(passive)" : " NEUTRAL(active)")
-                    : "";
+            String neutralTag = isNeutral() ? " NEUTRAL" : "";
             return kind.scriptName() + "(" + id + ") @" + pos
                     + " stun=" + stun + " ms=" + moveStack
                     + (isRoyal ? " ROYAL" : "")

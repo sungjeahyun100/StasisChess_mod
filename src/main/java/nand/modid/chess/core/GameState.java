@@ -73,8 +73,7 @@ public final class GameState {
      * 중립기물은 포켓에 넣을 수 없으므로 이 메서드를 통해서만 생성된다.
      *
      * <p>배치할 {@code kind}는 반드시 {@link Piece.PieceKind#isNeutral()} == true 이어야 한다.
-     * 능동형/수동형 여부는 {@link Piece.PieceKind#neutralPassive()} 에서 읽는다.
-     * 즉, 중립기물의 성격은 PieceKind 정의 시점에 이미 결정되어 있어야 한다.</p>
+     * 이동 가능 여부는 Chessembly 스크립트가 결정한다.</p>
      *
      * @param kind    중립기물로 선언된 PieceKind (kind.isNeutral() == true 이어야 함)
      * @param target  배치할 좌표
@@ -97,8 +96,7 @@ public final class GameState {
         piece.spec = new Piece.PieceSpec(kind);
         piece.pos = target;
         piece.stun = 0;
-        // 능동형/수동형은 kind.neutralPassive() 로 결정된다
-        piece.moveStack = kind.neutralPassive() ? 0 : RuleSet.initialMoveStack(piece.score());
+        piece.moveStack = RuleSet.initialMoveStack(piece.score());
 
         pieces.put(id, piece);
         board.put(target, id);
@@ -372,14 +370,13 @@ public final class GameState {
         canMovePiece(piece.owner, pieceId, from, to, mv.moveType);
 
         String capturedId = null;
-        boolean isPassiveNeutral = (piece.isNeutral() && piece.neutralPassive());
 
         switch (mv.moveType) {
             case MOVE: {
                 board.remove(from);
                 board.put(to, pieceId);
                 piece.pos = to;
-                if(!isPassiveNeutral) piece.moveStack--;
+                piece.moveStack--;
                 break;
             }
             case TAKE:
@@ -392,7 +389,7 @@ public final class GameState {
                 board.remove(from);
                 board.put(to, pieceId);
                 piece.pos = to;
-                if (capturedId == null && !isPassiveNeutral) piece.moveStack--;
+                if (capturedId == null) piece.moveStack--;
                 break;
             }
             case CATCH: {
@@ -410,7 +407,7 @@ public final class GameState {
                 board.put(from, targetPid);
                 board.put(to, pieceId);
                 piece.pos = to;
-                if(!isPassiveNeutral) piece.moveStack--;
+                piece.moveStack--;
                 Piece.PieceData tp = pieces.get(targetPid);
                 if (tp != null) tp.pos = from;
                 break;
@@ -419,7 +416,7 @@ public final class GameState {
                 board.remove(from);
                 board.put(to, pieceId);
                 piece.pos = to;
-                if(!isPassiveNeutral) piece.moveStack--;
+                piece.moveStack--;
 
                 if (mv.catchTo != null && mv.catchTo.isValid()) {
                     String victimId = board.get(mv.catchTo);
@@ -445,14 +442,6 @@ public final class GameState {
         if (victim == null) throw new IllegalStateException("피해자를 찾을 수 없습니다");
 
         Piece.PieceData attacker = pieces.get(attackerId);
-
-        //중립-수동형 기물의 경우 이동스택은 전이되지 않는다.
-        if (attacker.isNeutral() && attacker.neutralPassive()){
-            attacker.stun += victim.stun; //단, 스턴은 전이됨.
-            if (victim.pos != null) board.remove(victim.pos);
-            pieces.remove(victimId);
-            return;
-        }
 
         if (attacker != null) {
             attacker.moveStack = attacker.moveStack - 1 + victim.moveStack;
@@ -571,12 +560,10 @@ public final class GameState {
         turn = 1 - turn;
 
         // 다음 턴 기물들 이동 스택 초기화
-        // 능동형 중립기물은 매 반턴마다 스택을 초기화한다 (양측 모두 접근 가능)
+        // 중립기물은 매 반턴마다 스택을 초기화한다 (양측 모두 접근 가능)
         for (Piece.PieceData p : pieces.values()) {
             if (p.pos == null) continue;
-            if (p.owner == turn) {
-                p.moveStack = RuleSet.initialMoveStack(p.score());
-            } else if (p.isNeutral() && !p.neutralPassive()) {
+            if (p.owner == turn || p.isNeutral()) {
                 p.moveStack = RuleSet.initialMoveStack(p.score());
             }
         }

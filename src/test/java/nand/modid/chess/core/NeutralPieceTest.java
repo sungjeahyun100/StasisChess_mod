@@ -11,19 +11,20 @@ import static org.junit.jupiter.api.Assertions.*;
  * NeutralPieceTest — 중립기물(gray piece) 기능 단위 테스트.
  *
  * 테스트 범위:
- *  1. isNeutral / neutralPassive 필드 값 확인
- *  2. 능동형 중립기물: 이동 스택 초기화 확인
- *  3. 수동형 중립기물: 이동 스택 없음 확인
- *  4. 능동형 중립기물: 백·흑 양측 모두 이동 가능
- *  5. 수동형 중립기물: 직접 이동 불가 (합법 수 없음)
- *  6. 중립기물은 포획(take/take-move)할 수 없음
- *  7. 수동형 중립기물: Shift로 밀어서 이동
- *  8. 중립기물의 방향 관점이 현재 플레이어 색을 따름
- *  9. 스턴: 능동·수동 모두 적용되고 반턴마다 감소
- * 10. 중립기물 두 개 공존 확인
- * 11. PieceData.copy() 시 isNeutral·neutralPassive 복사 확인
- * 12. 중립기물이 포켓에 추가되지 않도록 직접 착수 방어 확인
- * 13. 능동형 중립기물: 캡처 시 스택 이전 확인
+ *  1. isNeutral 필드 값 확인
+ *  2. 중립기물: 이동 스택 초기화 확인
+ *  3. 중립기물(NEUTRAL_SENTINEL): 백·흑 양측 모두 이동 가능
+ *  4. 빈 스크립트 중립기물(NEUTRAL_PYLON): 자체 합법 수 없음
+ *  5. 중립기물은 포획(take/take-move)할 수 없음
+ *  6. Shift로 중립기물 이동
+ *  7. 중립기물의 방향 관점이 현재 플레이어 색을 따름
+ *  8. 스턴: 중립기물에 적용되고 반턴마다 감소
+ *  9. 중립기물 두 개 공존 확인
+ * 10. PieceData.copy() 시 isNeutral 복사 확인
+ * 11. 중립기물이 포켓에 추가되지 않도록 직접 착수 방어 확인
+ * 12. 중립기물: 캐프처 시 스택 이전 확인
+ * 13. 중립기물 반턴마다 moveStack 초기화 확인
+ * 14. 보드 배치 위치 등록 확인
  */
 @DisplayName("중립기물(Gray Piece) 기능 테스트")
 class NeutralPieceTest {
@@ -46,53 +47,49 @@ class NeutralPieceTest {
     // ── 테스트 1: 필드 초기값 ─────────────────────────────────────────────────
 
     @Test
-    @DisplayName("1. 능동형 중립기물(NEUTRAL_SENTINEL) 필드: isNeutral=true, neutralPassive=false, owner=-1")
-    void activeNeutralFields() {
+    @DisplayName("1. 중립기물(NEUTRAL_SENTINEL) 필드: isNeutral=true, owner=-1, moveStack>0")
+    void neutralSentinelFields() {
         GameState state = freshState();
         Move.Square d4 = new Move.Square(3, 3);
 
-        // NEUTRAL_SENTINEL 은 PieceKind 정의 시점에서 isNeutral=true, neutralPassive=false 로 선언된 기물
         String id = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_SENTINEL, d4);
         Piece.PieceData p = state.getPiece(id);
 
         assertTrue(p.isNeutral(),          "isNeutral 이 true 여야 한다");
-        assertFalse(p.neutralPassive(),     "능동형이므로 neutralPassive 는 false 여야 한다");
         assertEquals(-1, p.owner,         "owner 는 -1(중립) 이어야 한다");
-        assertTrue(p.moveStack > 0,       "능동형은 초기 이동 스택 > 0 이어야 한다");
+        assertTrue(p.moveStack > 0,       "초기 이동 스택 > 0 이어야 한다");
     }
 
     @Test
-    @DisplayName("2. 수동형 중립기물(NEUTRAL_PYLON) 필드: isNeutral=true, neutralPassive=true, moveStack=0")
-    void passiveNeutralFields() {
+    @DisplayName("2. 중립기물(NEUTRAL_PYLON) 필드: isNeutral=true, owner=-1, moveStack>0")
+    void neutralPylonFields() {
         GameState state = freshState();
         Move.Square e5 = new Move.Square(4, 4);
 
-        // NEUTRAL_PYLON 은 PieceKind 정의 시점에서 isNeutral=true, neutralPassive=true 로 선언된 기물
         String id = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_PYLON, e5);
         Piece.PieceData p = state.getPiece(id);
 
         assertTrue(p.isNeutral(),           "isNeutral 이 true 여야 한다");
-        assertTrue(p.neutralPassive(),       "수동형이므로 neutralPassive 는 true 여야 한다");
         assertEquals(-1, p.owner,          "owner 는 -1(중립) 이어야 한다");
-        assertEquals(0, p.moveStack,       "수동형은 초기 이동 스택이 0 이어야 한다");
+        assertTrue(p.moveStack > 0,        "모든 중립기물은 초기 이동 스택 > 0 이어야 한다");
     }
 
     // ── 테스트 3·4: 이동 가능 여부 ───────────────────────────────────────────
 
     @Test
-    @DisplayName("3. 능동형 중립기물(NEUTRAL_SENTINEL)은 백(0번) 플레이어 턴에 이동 가능하다")
-    void activeNeutralMovableByWhite() {
+    @DisplayName("3. 중립기물(NEUTRAL_SENTINEL)은 백(0번) 플레이어 턴에 이동 가능하다")
+    void neutralMovableByWhite() {
         GameState state = freshState(); // 백 턴
         Move.Square d4 = new Move.Square(3, 3);
         String id = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_SENTINEL, d4);
 
         List<Move.LegalMove> moves = state.getLegalMoves(id);
-        assertFalse(moves.isEmpty(), "백 턴에 능동형 중립 NEUTRAL_SENTINEL 은 합법 수를 가져야 한다");
+        assertFalse(moves.isEmpty(), "백 턴에 중립 NEUTRAL_SENTINEL 은 합법 수를 가져야 한다");
     }
 
     @Test
-    @DisplayName("4. 능동형 중립기물(NEUTRAL_SENTINEL)은 흑(1번) 플레이어 턴에도 이동 가능하다")
-    void activeNeutralMovableByBlack() {
+    @DisplayName("4. 중립기물(NEUTRAL_SENTINEL)은 흑(1번) 플레이어 턴에도 이동 가능하다")
+    void neutralMovableByBlack() {
         GameState state = freshState(); // 백 턴
         Move.Square d4 = new Move.Square(3, 3);
         String id = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_SENTINEL, d4);
@@ -101,24 +98,23 @@ class NeutralPieceTest {
         assertEquals(1, state.getTurn());
 
         List<Move.LegalMove> moves = state.getLegalMoves(id);
-        assertFalse(moves.isEmpty(), "흑 턴에도 능동형 중립 NEUTRAL_SENTINEL 은 합법 수를 가져야 한다");
+        assertFalse(moves.isEmpty(), "흑 턴에도 중립 NEUTRAL_SENTINEL 은 합법 수를 가져야 한다");
     }
 
     @Test
-    @DisplayName("5. 수동형 중립기물(NEUTRAL_PYLON)은 어느 턴에도 스스로는 합법 수가 없다")
-    void passiveNeutralHasNoLegalMoves() {
+    @DisplayName("5. 빈 스크립트 중립기물(NEUTRAL_PYLON)은 어느 턴에도 합법 수가 없다")
+    void emptyScriptNeutralHasNoLegalMoves() {
         GameState state = freshState();
         Move.Square e4 = new Move.Square(4, 3);
-        // NEUTRAL_PYLON 은 PieceKind 자체가 neutralPassive=true 로 선언됨
         String id = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_PYLON, e4);
 
         // 백 턴
         List<Move.LegalMove> movesWhite = state.getLegalMoves(id);
-        assertTrue(movesWhite.isEmpty(), "수동형은 백 턴에 합법 수가 없어야 한다");
+        assertTrue(movesWhite.isEmpty(), "NEUTRAL_PYLON은 빈 스크립트이므로 백 턴에 합법 수가 없어야 한다");
 
         skipTurn(state); // → 흑 턴
         List<Move.LegalMove> movesBlack = state.getLegalMoves(id);
-        assertTrue(movesBlack.isEmpty(), "수동형은 흑 턴에도 합법 수가 없어야 한다");
+        assertTrue(movesBlack.isEmpty(), "NEUTRAL_PYLON은 빈 스크립트이므로 흑 턴에도 합법 수가 없어야 한다");
     }
 
     // ── 테스트 6: 포획 불가 ───────────────────────────────────────────────────
@@ -150,30 +146,30 @@ class NeutralPieceTest {
         }
     }
 
-    // ── 테스트 7: Shift로 수동형 이동 ─────────────────────────────────────────
+    // ── 테스트 7: Shift로 중립기물 이동 ─────────────────────────
 
     @Test
-    @DisplayName("7. 능동형 기물(NEUTRAL_SENTINEL)이 Shift를 사용해 수동형 중립기물(NEUTRAL_PYLON) 위치를 교환할 수 있다")
-    void passiveNeutralMovableByShift() {
+    @DisplayName("7. 중립기물(NEUTRAL_SENTINEL)이 Shift를 사용해 다른 중립기물(NEUTRAL_PYLON) 위치를 교환할 수 있다")
+    void neutralMovableByShift() {
         GameState state = freshState();
 
-        // NEUTRAL_PYLON 은 PieceKind 자체가 neutralPassive=true 로 선언된 수동형 중립기물
+        // NEUTRAL_PYLON 은 빈 스크립트로 자체 이동 불가한 중립기물
         Move.Square e5 = new Move.Square(4, 4);
-        String passiveId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_PYLON, e5);
+        String pylonId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_PYLON, e5);
 
-        // NEUTRAL_SENTINEL 은 PieceKind 자체가 neutralPassive=false 로 선언된 능동형 중립기물
+        // NEUTRAL_SENTINEL 은 나이트 행마 중립기물
         Move.Square e4 = new Move.Square(4, 3);
-        String activeId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_SENTINEL, e4);
+        String sentinelId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_SENTINEL, e4);
 
         // shift(0, 1) — 위 칸(e5) 교환 스크립트로 합법 수 생성
         String shiftScript = "shift(0, 1);";
-        List<Move.LegalMove> shiftMoves = MoveGenerator.generateWithScript(state, activeId, shiftScript);
+        List<Move.LegalMove> shiftMoves = MoveGenerator.generateWithScript(state, sentinelId, shiftScript);
 
         // e4 → e5 방향 Shift 수 존재 여부
         boolean hasShiftToE5 = shiftMoves.stream().anyMatch(mv ->
             mv.to.equals(e5) && mv.moveType == nand.modid.chess.dsl.chessembly.AST.MoveType.SHIFT
         );
-        assertTrue(hasShiftToE5, "능동형 기물이 수동형 중립기물을 Shift로 밀 수 있어야 한다");
+        assertTrue(hasShiftToE5, "중립기물이 다른 중립기물을 Shift로 밀 수 있어야 한다");
     }
 
     // ── 테스트 8: 방향 관점 ───────────────────────────────────────────────────
@@ -228,8 +224,8 @@ class NeutralPieceTest {
     }
 
     @Test
-    @DisplayName("9-b. 수동형 중립기물(NEUTRAL_PYLON)에도 스턴이 부여되고 반턴마다 감소한다")
-    void passiveNeutralStunDecreases() {
+    @DisplayName("9-b. 중립기물(NEUTRAL_PYLON)에도 스턴이 부여되고 반턴마다 감소한다")
+    void pylonNeutralStunDecreases() {
         GameState state = freshState();
         Move.Square f6 = new Move.Square(5, 5);
         String id = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_PYLON, f6);
@@ -244,37 +240,37 @@ class NeutralPieceTest {
     // ── 테스트 10: 공존 ───────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("10. 능동형(NEUTRAL_SENTINEL)·수동형(NEUTRAL_PYLON) 중립기물이 보드에 동시에 존재할 수 있다")
+    @DisplayName("10. 중립기물(NEUTRAL_SENTINEL)·중립기물(NEUTRAL_PYLON)이 보드에 동시에 존재할 수 있다")
     void multipleNeutralsCoexist() {
         GameState state = freshState();
 
-        String activeId  = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_SENTINEL, new Move.Square(2, 2));
-        String passiveId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_PYLON,    new Move.Square(5, 5));
+        String sentinelId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_SENTINEL, new Move.Square(2, 2));
+        String pylonId    = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_PYLON,    new Move.Square(5, 5));
 
-        Piece.PieceData active  = state.getPiece(activeId);
-        Piece.PieceData passive = state.getPiece(passiveId);
+        Piece.PieceData sentinel = state.getPiece(sentinelId);
+        Piece.PieceData pylon    = state.getPiece(pylonId);
 
-        assertNotNull(active,  "능동형 중립기물이 존재해야 한다");
-        assertNotNull(passive, "수동형 중립기물이 존재해야 한다");
-        assertTrue(active.isNeutral()  && !active.neutralPassive(),  "능동형 필드 정상");
-        assertTrue(passive.isNeutral() &&  passive.neutralPassive(), "수동형 필드 정상");
+        assertNotNull(sentinel, "NEUTRAL_SENTINEL 중립기물이 존재해야 한다");
+        assertNotNull(pylon,    "NEUTRAL_PYLON 중립기물이 존재해야 한다");
+        assertTrue(sentinel.isNeutral(), "SENTINEL isNeutral 정상");
+        assertTrue(pylon.isNeutral(),    "PYLON isNeutral 정상");
     }
 
     // ── 테스트 11: copy() ─────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("11. PieceData.copy() 시 isNeutral·neutralPassive 가 복사된다 (PieceKind에서 위임)")
+    @DisplayName("11. PieceData.copy() 시 isNeutral 이 복사된다 (PieceKind에서 위임)")
     void copyPreservesNeutralFields() {
         GameState state = freshState();
-        String activeId  = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_SENTINEL, new Move.Square(1, 1));
-        String passiveId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_PYLON,    new Move.Square(6, 6));
+        String sentinelId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_SENTINEL, new Move.Square(1, 1));
+        String pylonId    = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_PYLON,    new Move.Square(6, 6));
 
-        Piece.PieceData ac = state.getPiece(activeId).copy();
-        Piece.PieceData pc = state.getPiece(passiveId).copy();
+        Piece.PieceData sc = state.getPiece(sentinelId).copy();
+        Piece.PieceData pc = state.getPiece(pylonId).copy();
 
-        assertTrue(ac.isNeutral()   && !ac.neutralPassive(), "능동형 copy: isNeutral=true, neutralPassive=false");
-        assertTrue(pc.isNeutral()   &&  pc.neutralPassive(), "수동형 copy: isNeutral=true, neutralPassive=true");
-        assertEquals(-1, ac.owner, "copy 후 owner=-1 유지");
+        assertTrue(sc.isNeutral(), "SENTINEL copy: isNeutral=true");
+        assertTrue(pc.isNeutral(), "PYLON copy: isNeutral=true");
+        assertEquals(-1, sc.owner, "copy 후 owner=-1 유지");
         assertEquals(-1, pc.owner, "copy 후 owner=-1 유지");
     }
 
@@ -296,8 +292,8 @@ class NeutralPieceTest {
     // ── 테스트 13: 캡처 시 스택 이전 ─────────────────────────────────────────
 
     @Test
-    @DisplayName("13. 능동형 중립기물(NEUTRAL_SENTINEL)이 적 기물을 포회하면 스택이 이전된다")
-    void activeNeutralCaptureTransfersStack() {
+    @DisplayName("13. 중립기물(NEUTRAL_SENTINEL)이 적 기물을 포회하면 스택이 이전된다")
+    void neutralCaptureTransfersStack() {
         GameState state = freshState();
 
         // 능동형 중립기물를 a3(0,2)에 배치
@@ -305,17 +301,9 @@ class NeutralPieceTest {
         String neutralId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_SENTINEL, a3);
         Piece.PieceData neutral = state.getPiece(neutralId);
 
-        // 흑 소유 비숍을 a5(0,4)에 배치 (캡처 대상)
-        // — 직접 PieceData를 만들어 내부 pieces/board에 등록하는 대신,
-        //   placeNeutralPiece를 이용해 흑 비숍처럼 동작하는 기물을 선명히 구별하기 위해
-        //   흑 비숍은 일반 포켓 착수 경로를 사용할 수 없으므로
-        //   GameState 내부를 직접 활용하지 않고,
-        //   동일 플레이어(백) 관점에서 "비중립 적"이 있는 상황은
-        //   별도 API가 없으므로 이 테스트는 스택 이전 공식 검증으로 대체:
-
-        // 시나리오: 중립 루크를 두고 moveStack·stun 초기값 확인
+        // 시나리오: 중립 기물을 두고 moveStack·stun 초기값 확인
         int initialStack = neutral.moveStack;
-        assertTrue(initialStack > 0, "능동형 중립기물 초기 moveStack > 0");
+        assertTrue(initialStack > 0, "중립기물 초기 moveStack > 0");
 
         // 반턴 후에도 moveStack 이 재초기화되는지 확인
         skipTurn(state); // 흑 턴
@@ -323,35 +311,36 @@ class NeutralPieceTest {
 
         int afterTwoHalfTurns = state.getPiece(neutralId).moveStack;
         assertTrue(afterTwoHalfTurns > 0,
-            "2반턴 후에도 능동형 중립기물의 moveStack 이 초기화되어야 한다");
+            "2반턴 후에도 중립기물의 moveStack 이 초기화되어야 한다");
     }
 
-    // ── 테스트 14: 능동형 이동 스택 반턴마다 재초기화 ─────────────────────────
+    // ── 테스트 14: 중립기물 이동 스택 반턴마다 재초기화 ─────────────────────────
 
     @Test
-    @DisplayName("14. 능동형 중립기물(NEUTRAL_SENTINEL)는 반턴마다 moveStack 이 초기화된다 (수동형 NEUTRAL_PYLON 은 유지 0)")
+    @DisplayName("14. 모든 중립기물은 반턴마다 moveStack 이 초기화된다")
     void moveStackRefreshPerHalfTurn() {
         GameState state = freshState();
 
-        String activeId  = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_SENTINEL, new Move.Square(0, 2));
-        String passiveId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_PYLON,    new Move.Square(5, 2));
+        String sentinelId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_SENTINEL, new Move.Square(0, 2));
+        String pylonId    = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_PYLON,    new Move.Square(5, 2));
 
-        Piece.PieceData active  = state.getPiece(activeId);
-        Piece.PieceData passive = state.getPiece(passiveId);
+        Piece.PieceData sentinel = state.getPiece(sentinelId);
+        Piece.PieceData pylon    = state.getPiece(pylonId);
 
-        // 시작 시
-        assertTrue(active.moveStack > 0, "능동형 초기 moveStack > 0");
-        assertEquals(0, passive.moveStack, "수동형 초기 moveStack == 0");
+        // 시작 시 — 모든 중립기물이 moveStack > 0
+        assertTrue(sentinel.moveStack > 0, "SENTINEL 초기 moveStack > 0");
+        assertTrue(pylon.moveStack > 0,    "PYLON 초기 moveStack > 0");
 
-        // 강제로 능동형 스택 소진
-        active.moveStack = 0;
+        // 강제로 스택 소진
+        sentinel.moveStack = 0;
+        pylon.moveStack = 0;
 
         skipTurn(state); // 반턴 종료
 
-        assertTrue(active.moveStack > 0,
-            "반턴 후 능동형 중립기물 moveStack 이 재초기화되어야 한다");
-        assertEquals(0, passive.moveStack,
-            "반턴 후 수동형 중립기물 moveStack 은 여전히 0 이어야 한다");
+        assertTrue(sentinel.moveStack > 0,
+            "반턴 후 SENTINEL 중립기물 moveStack 이 재초기화되어야 한다");
+        assertTrue(pylon.moveStack > 0,
+            "반턴 후 PYLON 중립기물 moveStack 도 재초기화되어야 한다");
     }
 
     // ── 테스트 15: 보드 배치 위치 등록 확인 ──────────────────────────────────
