@@ -286,7 +286,6 @@ List<Move.LegalMove> moves = state.getLegalMovesAt(d4);
 - 다른 기물이 `shift`로 중립기물 위치를 교환하는 것은 가능하다.
 - **스턴 스택**은 매 반턴(각 플레이어의 턴이 끝날 때)마다 1씩 감소한다.
 - **이동 스택**은 매 반턴마다 `RuleSet.initialMoveStack(score)`로 초기화된다.
-- **이동 가능 여부는 Chessembly 스크립트가 결정**한다. 자체 이동이 불가능한 기물은 빈 스크립트(`""`)를 반환하면 된다.
 
 ### Step A — `PieceKind` enum 등록: 중립 속성 내장
 
@@ -295,11 +294,7 @@ List<Move.LegalMove> moves = state.getLegalMovesAt(d4);
 ```java
 // 형식: (scriptName, score, isNeutral)
 
-// 자체 이동 가능한 중립기물 예: 나이트라이더 행마
 NEUTRAL_KNIGHTRIDER("neutral_knightrider", 7, true),
-
-// 자체 이동 불가 중립기물 예: Shift로만 이동 (빈 스크립트)
-NEUTRAL_BLOCKADE("neutral_blockade", 5, true),
 ```
 
 > **왜 PieceKind에 내장하는가?**
@@ -310,7 +305,6 @@ NEUTRAL_BLOCKADE("neutral_blockade", 5, true),
 
 행마법은 일반 기물과 동일하게 작성합니다.
 방향 판별(`isWhite`)은 중립기물을 **사용 중인 플레이어**의 색을 기준으로 자동 결정됩니다.
-**자체 이동이 불가능한 기물**은 빈 스크립트(`""`)를 반환합니다 — Shift로만 이동됩니다.
 
 ```java
 case NEUTRAL_KNIGHTRIDER:
@@ -318,17 +312,12 @@ case NEUTRAL_KNIGHTRIDER:
          + " take-move(2, -1) repeat(1); take-move(1, -2) repeat(1);"
          + " take-move(-1, 2) repeat(1); take-move(-2, 1) repeat(1);"
          + " take-move(-2, -1) repeat(1); take-move(-1, -2) repeat(1);";
-
-case NEUTRAL_BLOCKADE:
-    // 자체 이동 불가 — Shift로만 이동됨
-    return "";
 ```
 
 ### Step C — `fromString()` 파싱 등록 (일반 절차와 동일)
 
 ```java
 case "neutral_knightrider": return NEUTRAL_KNIGHTRIDER;
-case "neutral_blockade":    return NEUTRAL_BLOCKADE;
 ```
 
 ### Step D — 보드에 배치: `placeNeutralPiece(kind, target)`
@@ -340,13 +329,8 @@ case "neutral_blockade":    return NEUTRAL_BLOCKADE;
 ```java
 GameState state = GameState.newDefault();
 
-// 자체 이동 가능 — chessemblyScript()가 행마를 반환
 Move.Square d4 = new Move.Square(3, 3);
 String neutralId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_KNIGHTRIDER, d4);
-
-// 자체 이동 불가 — chessemblyScript()가 빈 문자열 반환, Shift로만 이동
-Move.Square e5 = new Move.Square(4, 4);
-String blockadeId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_BLOCKADE, e5);
 ```
 
 > **주의:** `placePiece()` (포켓 착수 메서드)는 중립기물용이 아닙니다.
@@ -360,10 +344,9 @@ String blockadeId = state.placeNeutralPiece(Piece.PieceKind.NEUTRAL_BLOCKADE, e5
 ```java
 // abbrev() (MinecraftChessManager.java)
 case NEUTRAL_KNIGHTRIDER -> "nNr";
-case NEUTRAL_BLOCKADE    -> "nBl";
 
 // getPieceItemForKind() — 필요한 경우
-case NEUTRAL_KNIGHTRIDER, NEUTRAL_BLOCKADE ->
+case NEUTRAL_KNIGHTRIDER ->
     Blocks.LIGHT_GRAY_CONCRETE.getDefaultState();
 ```
 
@@ -373,21 +356,10 @@ case NEUTRAL_KNIGHTRIDER, NEUTRAL_BLOCKADE ->
 |---|---|
 | `kind.isNeutral()` | `true`이면 중립기물 종류. `placeNeutralPiece()`만 사용 가능. |
 
-### Chessembly에서 중립기물 밀기 예시
-
-자체 이동 불가 중립기물은 `shift` 명령으로 이동시킵니다.
-아래는 인접한 모든 방향에 Shift를 수행하는 기물 스크립트 예시입니다:
-
-```
-// 아군/중립 기물이 있는 칸을 교환 (Shift)
-shift(1, 0); shift(-1, 0); shift(0, 1); shift(0, -1);
-shift(1, 1); shift(1, -1); shift(-1, 1); shift(-1, -1);
-```
-
 ### 중립기물 추가 체크리스트
 
 - [ ] **Step A** `PieceKind` enum에 `(scriptName, score, true)` 3-인자 상수 추가
-- [ ] **Step B** `chessemblyScript()` switch에 Chessembly 행마법 case 추가 (이동 불가 시 빈 문자열)
+- [ ] **Step B** `chessemblyScript()` switch에 Chessembly 행마법 case 추가
 - [ ] **Step C** `fromString()` switch에 파싱 case 추가
 - [ ] **Step D** 배치 시 `placeNeutralPiece(kind, target)` 호출
 - [ ] **Step E** `abbrev()` 및 `getPieceItemForKind()` switch에 마인크래프트 케이스 추가 (회색 계열 권장)
