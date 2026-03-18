@@ -20,7 +20,7 @@ public final class GameState {
     private final Map<Integer, List<Piece.PieceSpec>> pockets = new HashMap<>();
     private final Map<String, Piece.PieceData> pieces = new HashMap<>();
     private int turn;
-    private final Map<String, Integer> globalState = new HashMap<>();
+
     private String activePiece;   // 현재 턴에 이동 중인 기물 ID
     private boolean actionTaken;  // 이번 턴에 행동 여부
     private final List<Move.Action> turnActions = new ArrayList<>();
@@ -468,9 +468,11 @@ public final class GameState {
                     }
                     break;
                 }
-                case SET_STATE:
-                    globalState.put(tag.key, tag.value);
+                case SET_STATE: {
+                    Piece.PieceData sp = pieces.get(pieceId);
+                    if (sp != null) sp.state.put(tag.key, tag.value);
                     break;
+                }
                 case USEING_STACK:
                     String actor = board.get(tag.where_stack_is_comming);
                     Piece.PieceData p = pieces.get(actor);
@@ -612,12 +614,9 @@ public final class GameState {
             if (p != null) {
                 // 중립기물은 현재 기물(및 현재 플레이어)과 같은 색으로 등록 → 아군 취급
                 boolean pIsWhite = p.isNeutral() ? pieceIsWhite : p.isWhite();
-                bs.putPiece(sq.x, sq.y, p.effectiveKind().scriptName(), pIsWhite, p.stun, p.moveStack);
+                bs.putPiece(sq.x, sq.y, p.effectiveKind().scriptName(), pIsWhite, p.stun, p.moveStack, p.state);
             }
         }
-
-        // 전역 상태 복사
-        bs.state.putAll(globalState);
 
         return bs;
     }
@@ -712,8 +711,13 @@ public final class GameState {
         return pockets.getOrDefault(player, Collections.emptyList());
     }
 
+    /** 모든 기물의 state를 병합하여 반환 (디버그용) */
     public Map<String, Integer> getGlobalState() {
-        return Collections.unmodifiableMap(globalState);
+        Map<String, Integer> merged = new HashMap<>();
+        for (Piece.PieceData p : pieces.values()) {
+            merged.putAll(p.state);
+        }
+        return Collections.unmodifiableMap(merged);
     }
 
     /** 보드 위 모든 기물 정보 반환 */

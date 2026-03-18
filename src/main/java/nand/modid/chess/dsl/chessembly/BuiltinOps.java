@@ -16,6 +16,8 @@ public final class BuiltinOps {
         public final boolean isWhite;
         public final int stun_stack;
         public final int move_stack;
+        /** 기물별 상태 */
+        public final Map<String, Integer> state = new HashMap<>();
 
         public PieceInfo(String name, boolean isWhite, int st, int mo) {
             this.name = name;
@@ -35,8 +37,6 @@ public final class BuiltinOps {
         public boolean isWhite;
         /** (x,y) → PieceInfo */
         public final Map<Long, PieceInfo> pieces = new HashMap<>();
-        /** 전역 상태 */
-        public final Map<String, Integer> state = new HashMap<>();
         /** 위협 칸 */
         public final Set<Long> dangerSquares = new HashSet<>();
         /** 체크 상태 */
@@ -58,6 +58,13 @@ public final class BuiltinOps {
 
         public void putPiece(int x, int y, String name, boolean white, int stun, int move) {
             pieces.put(key(x, y), new PieceInfo(name, white, stun, move));
+        }
+
+        public void putPiece(int x, int y, String name, boolean white, int stun, int move,
+                             Map<String, Integer> pieceState) {
+            PieceInfo info = new PieceInfo(name, white, stun, move);
+            if (pieceState != null) info.state.putAll(pieceState);
+            pieces.put(key(x, y), info);
         }
 
         public boolean inBounds(int x, int y) {
@@ -84,7 +91,8 @@ public final class BuiltinOps {
         }
 
         public int getState(String k) {
-            return state.getOrDefault(k, 0);
+            PieceInfo info = pieces.get(key(pieceX, pieceY));
+            return info != null ? info.state.getOrDefault(k, 0) : 0;
         }
 
         public boolean isDanger(int x, int y) {

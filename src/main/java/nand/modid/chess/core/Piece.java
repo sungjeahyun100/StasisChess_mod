@@ -296,6 +296,8 @@ public final class Piece {
         public int moveStack;
         public boolean isRoyal;
         public PieceKind disguise; // nullable
+        /** 기물별 상태 */
+        public final java.util.Map<String, Integer> state = new java.util.HashMap<>();
 
         /**
          * 이 기물의 스펙(종류·중립 여부 등 고유 특성).
@@ -356,6 +358,7 @@ public final class Piece {
             c.isRoyal = isRoyal;
             c.disguise = disguise;
             c.spec = spec; // PieceSpec는 불변(final 필드)이므로 참조 공유
+            c.state.putAll(state);
             return c;
         }
 
