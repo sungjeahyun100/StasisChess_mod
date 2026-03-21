@@ -117,7 +117,6 @@ String notation = e4.toNotation(); // "e4"
 | `Piece` | 기물 정의 |
 | `Move` | 좌표 및 이동 |
 | `MoveGenerator` | 합법 수 생성 |
-| `Interpreter` | Chessembly 실행 |
 
 ---
 
@@ -242,37 +241,7 @@ public class MoveHintGame {
 }
 ```
 
-### 시나리오 3: 커스텀 기물 사용
-
-```java
-public class CustomPieceGame {
-    public static void main(String[] args) {
-        ChessStackEngine engine = new ChessStackEngine();
-        
-        // 1. 커스텀 기물 정의
-        String superKnightScript = 
-            "take-move(1, 2) repeat(2); " +  // 나이트 점프 2번
-            "take-move(2, 1) repeat(2);";
-        
-        engine.loadDSLPiece("superknight", superKnightScript);
-        
-        // 2. 게임 생성
-        String gameId = engine.createExperimentalGame();
-        
-        // 3. 커스텀 기물 착수
-        engine.placePiece(gameId, "superknight", 0, 0); // a1
-        engine.endTurn();
-        
-        // 4. 합법 수 확인
-        List<Move.LegalMove> moves = engine.getLegalMoves(gameId, 0, 0);
-        System.out.println("슈퍼나이트 이동 가능: " + moves.size() + "칸");
-        
-        moves.forEach(m -> System.out.println("  → " + m.to.toNotation()));
-    }
-}
-```
-
-### 시나리오 4: AI 대전 (간단한 예)
+### 시나리오 3: AI 대전 (간단한 예)
 
 ```java
 public class SimpleAI {
@@ -359,7 +328,7 @@ public class SimpleAI {
 }
 ```
 
-### 시나리오 5: 게임 저장/로드
+### 시나리오 4: 게임 저장/로드
 
 ```java
 import com.google.gson.Gson;
@@ -565,13 +534,8 @@ engine.setDebugMode(gameId, false); // ✓
 
 2. **[Move Generation API](02-move-generation-api.md)** - 합법 수 생성
    - MoveGenerator, StandardGenerators
-   - 커스텀 이동 패턴
 
-3. **[Chessembly DSL API](03-chessembly-dsl-api.md)** - DSL 심화
-   - Interpreter, Parser, AST
-   - 고급 기법 및 디버깅
-
-4. **[Minecraft Integration API](04-minecraft-integration-api.md)** - Minecraft 통합
+3. **[Minecraft Integration API](04-minecraft-integration-api.md)** - Minecraft 통합
    - Fabric 모드 연동
    - 멀티플레이어, GUI
 

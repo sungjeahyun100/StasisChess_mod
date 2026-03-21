@@ -41,7 +41,7 @@ Steps 5~6은 필요에 따라 선택적으로 추가합니다.
 `PieceKind` enum에 새로운 상수를 추가합니다.
 
 ```java
-// 기존 마지막 항목 아래에 추가 (CUSTOM 앞)
+// 기존 마지막 항목 아래에 추가
 WAZIR("wazir", 2),
 ```
 
@@ -92,7 +92,7 @@ case WAZIR:
     return "take-move(1, 0); take-move(-1, 0); take-move(0, 1); take-move(0, -1);";
 ```
 
-더 복잡한 DSL 문법은 [Chessembly DSL API](03-chessembly-dsl-api.md) 및 [Chessembly 튜토리얼](../chessembly/TUTORIAL.md)을 참조하세요.
+더 복잡한 DSL 문법은 내부 참조 문서를 참조하세요.
 
 ---
 
@@ -107,7 +107,7 @@ case WAZIR:
 case "wazir": return WAZIR;
 ```
 
-이 등록을 빠뜨리면 `PieceKind.fromString("wazir")` 호출 시 `CUSTOM`이 반환되어 행마법이 잘못 적용됩니다.
+이 등록을 빠뜨리면 `PieceKind.fromString("wazir")` 호출 시 `IllegalArgumentException`이 발생합니다.
 
 ---
 
@@ -267,8 +267,6 @@ List<Move.LegalMove> moves = state.getLegalMovesAt(d4);
 ## 다음 단계
 
 - [Core API](01-core-api.md) — 게임 상태 및 기물 API
-- [Chessembly DSL API](03-chessembly-dsl-api.md) — 고급 행마법 문법
-- [Chessembly 튜토리얼](../chessembly/TUTORIAL.md) — DSL 입문
 
 ---
 

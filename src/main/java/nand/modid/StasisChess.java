@@ -52,7 +52,6 @@ public class StasisChess implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		ModItems.register();
-		nand.modid.game.ChessemblyFileLoader.loadAll();
 
 		// Register the payload types
 		PayloadTypeRegistry.playS2C().register(PerspectivePacketPayload.ID, PerspectivePacketPayload.CODEC);
@@ -71,7 +70,6 @@ public class StasisChess implements ModInitializer {
 							}))
 					.then(CommandManager.literal("reload")
 							.executes(context -> {
-								nand.modid.game.ChessemblyFileLoader.loadAll();
 								// 모든 플레이어에게 텍스처 리로드 신호 전송
 								if (context.getSource().getServer() != null) {
 									for (ServerPlayerEntity player : context.getSource().getServer().getPlayerManager()
@@ -81,7 +79,7 @@ public class StasisChess implements ModInitializer {
 									}
 								}
 								context.getSource().sendMessage(
-										Text.literal("§a[StasisChess] External scripts and textures reloaded!"));
+										Text.literal("§a[StasisChess] Textures reloaded!"));
 								return 1;
 							}))
 					.then(CommandManager.literal("debug")

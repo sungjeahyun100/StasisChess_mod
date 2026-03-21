@@ -33,7 +33,6 @@ public final class Piece {
         CANNON("cannon", 5),
         BOUNCING_BISHOP("bouncing_bishop", 7),
         EXPERIMENT("experiment", 1),
-        CUSTOM("custom", 3),
 
         // ── 중립기물 (gray piece) ─────────────────────────
         // 새 중립기물을 만들 때 여기에 (scriptName, score, isNeutral=true) 로 추가하세요.
@@ -208,10 +207,6 @@ public final class Piece {
                          + " move(1, 1); move(-1, 1); move(-1, -1); move(1, -1);"
                          + " catch(2, 2);";
 
-                case CUSTOM:
-                    return "take-move(1, 0); take-move(-1, 0); take-move(0, 1); take-move(0, -1);"
-                         + " take-move(1, 1); take-move(1, -1); take-move(-1, 1); take-move(-1, -1);";
-
                 // ── 중립기물 행마법 ────────────────────────────
                 case NEUTRAL_SENTINEL:
                     // 나이트 행마 (방향 무관)
@@ -235,7 +230,7 @@ public final class Piece {
 
         /** 문자열에서 PieceKind 파싱 */
         public static PieceKind fromString(String s) {
-            if (s == null) return CUSTOM;
+            if (s == null) throw new IllegalArgumentException("기물 이름이 null입니다");
             switch (s.toLowerCase()) {
                 case "pawn": return PAWN;
                 case "king": return KING;
@@ -259,7 +254,7 @@ public final class Piece {
                 case "neutral_sentinel": return NEUTRAL_SENTINEL;
                 case "neutral_pylon": return NEUTRAL_PYLON;
                 case "neutral_wanderer": return NEUTRAL_WANDERER;
-                default: return CUSTOM;
+                default: throw new IllegalArgumentException("알 수 없는 기물 이름: " + s);
             }
         }
     }

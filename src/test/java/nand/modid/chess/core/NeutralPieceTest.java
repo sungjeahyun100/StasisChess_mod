@@ -1,6 +1,7 @@
 package nand.modid.chess.core;
 
 import nand.modid.chess.movegen.MoveGenerator;
+import nand.modid.chess.dsl.chessembly.*;
 import org.junit.jupiter.api.*;
 
 import java.util.List;
@@ -163,7 +164,19 @@ class NeutralPieceTest {
 
         // shift(0, 1) — 위 칸(e5) 교환 스크립트로 합법 수 생성
         String shiftScript = "shift(0, 1);";
-        List<Move.LegalMove> shiftMoves = MoveGenerator.generateWithScript(state, sentinelId, shiftScript);
+        BuiltinOps.BoardState board = state.toChessemblyBoard(sentinelId);
+        Interpreter interpreter = new Interpreter();
+        interpreter.parse(shiftScript);
+        List<AST.Activation> activations = interpreter.execute(board);
+
+        // Activation → LegalMove 변환
+        List<Move.LegalMove> shiftMoves = new java.util.ArrayList<>();
+        for (AST.Activation act : activations) {
+            Move.Square target = new Move.Square(e4.x + act.dx, e4.y + act.dy);
+            if (!target.isValid()) continue;
+            shiftMoves.add(new Move.LegalMove(
+                    e4, target, act.moveType, false, act.tags, new Move.Square(0, 0)));
+        }
 
         // e4 → e5 방향 Shift 수 존재 여부
         boolean hasShiftToE5 = shiftMoves.stream().anyMatch(mv ->
