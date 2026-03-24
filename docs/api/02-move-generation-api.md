@@ -4,7 +4,6 @@ Chessembly 인터프리터를 사용한 합법 수 생성 API 문서입니다.
 
 ## 목차
 - [MoveGenerator](#movegenerator) - 합법 수 생성
-- [StandardGenerators](#standardgenerators) - 기본 행마법 관리
 - [고급 사용법](#고급-사용법)
 
 ---
@@ -75,124 +74,6 @@ for (Move.LegalMove move : moves) {
         move.to.toNotation(), 
         move.isCapture);
 }
-```
-
-### generateWithScript()
-
-커스텀 Chessembly 스크립트로 합법 수를 계산합니다.
-
-```java
-/**
- * 커스텀 DSL 스크립트로 합법 수를 계산한다.
- *
- * @param state   현재 게임 상태
- * @param pieceId 기물 ID
- * @param script  Chessembly 스크립트
- * @return 합법 수 목록
- */
-public static List<Move.LegalMove> generateWithScript(
-    GameState state, 
-    String pieceId, 
-    String script
-)
-```
-
-**예제: 커스텀 기물**
-
-```java
-// 커스텀 "스파이더" 기물 정의
-// - 1칸 대각선 이동
-// - 2칸 직선 점프
-String spiderScript = 
-    "take-move(1, 1); take-move(1, -1); " +
-    "take-move(-1, 1); take-move(-1, -1); " +
-    "take-move(2, 0); take-move(-2, 0); " +
-    "take-move(0, 2); take-move(0, -2);";
-
-// 커스텀 스크립트로 합법 수 생성
-List<Move.LegalMove> moves = MoveGenerator.generateWithScript(
-    state, 
-    spiderId, 
-    spiderScript
-);
-
-System.out.println("스파이더 이동 가능: " + moves.size() + "칸");
-```
-
-**예제: 동적 행마법 변경**
-
-```java
-// 기물 상태에 따라 행마법 변경
-Piece.PieceData piece = state.getPiece(pieceId);
-
-String script;
-if (piece.stun > 0) {
-    // 스턴 상태: 이동 불가
-    script = "";
-} else if (piece.moveStack == 1) {
-    // 마지막 이동: 1칸만
-    script = "take-move(1, 0); take-move(-1, 0); " +
-             "take-move(0, 1); take-move(0, -1);";
-} else {
-    // 정상: 표준 룩 이동
-    script = piece.kind.chessemblyScript(piece.isWhite());
-}
-
-List<Move.LegalMove> moves = MoveGenerator.generateWithScript(
-    state, pieceId, script
-);
-```
-
----
-
-## StandardGenerators
-
-`StandardGenerators`는 커스텀 DSL 기물을 등록하고 관리하는 클래스입니다.
-
-### registerScript()
-
-기물 이름과 스크립트를 등록합니다.
-
-```java
-import com.chesstack.engine.movegen.StandardGenerators;
-
-// 커스텀 기물 등록
-String magicKnightScript = 
-    "take-move(1, 2) repeat(2); " +  // 나이트 이동을 2번까지
-    "take-move(2, 1) repeat(2); " +
-    "take-move(2, -1) repeat(2); " +
-    "take-move(1, -2) repeat(2); " +
-    "take-move(-1, 2) repeat(2); " +
-    "take-move(-2, 1) repeat(2); " +
-    "take-move(-2, -1) repeat(2); " +
-    "take-move(-1, -2) repeat(2);";
-
-StandardGenerators.registerScript("magicknight", magicKnightScript);
-```
-
-### 여러 기물 한번에 등록
-
-```java
-Map<String, String> customPieces = new HashMap<>();
-
-// 슈퍼 폰 (2칸 전진 가능)
-customPieces.put("superpawn", 
-    "move(0, 1); move(0, 2); take(1, 1); take(-1, 1);");
-
-// 미니 퀸 (2칸까지만 이동 가능)
-customPieces.put("miniqueen",
-    "take-move(1, 0) repeat(2); take-move(-1, 0) repeat(2); " +
-    "take-move(0, 1) repeat(2); take-move(0, -1) repeat(2); " +
-    "take-move(1, 1) repeat(2); take-move(1, -1) repeat(2); " +
-    "take-move(-1, 1) repeat(2); take-move(-1, -1) repeat(2);");
-
-// 텔레포터 (특정 좌표로 순간이동)
-customPieces.put("teleporter",
-    "take-move(3, 3); take-move(3, -3); " +
-    "take-move(-3, 3); take-move(-3, -3);");
-
-// 일괄 등록
-customPieces.forEach(StandardGenerators::registerScript);
 ```
 
 ---
@@ -374,68 +255,7 @@ public int countLegalMoves(GameState state, int player) {
 
 ## 실전 예제
 
-### 예제 1: 커스텀 체스 변형 구현
-
-```java
-import com.chesstack.engine.core.*;
-import com.chesstack.engine.movegen.*;
-import java.util.*;
-
-public class CustomChessVariant {
-    
-    public static void main(String[] args) {
-        // 커스텀 기물 정의
-        defineCustomPieces();
-        
-        // 게임 생성
-        GameState state = createCustomGame();
-        
-        // 게임 진행
-        playGame(state);
-    }
-    
-    static void defineCustomPieces() {
-        // 1. 워리어 (전사): 킹처럼 움직이지만 왕족 아님
-        StandardGenerators.registerScript("warrior",
-            "take-move(1, 0); take-move(-1, 0); " +
-            "take-move(0, 1); take-move(0, -1); " +
-            "take-move(1, 1); take-move(1, -1); " +
-            "take-move(-1, 1); take-move(-1, -1);");
-        
-        // 2. 아쿠아 (물의 기물): 대각선으로만 이동
-        StandardGenerators.registerScript("aqua",
-            "take-move(1, 1) repeat(1); take-move(1, -1) repeat(1); " +
-            "take-move(-1, 1) repeat(1); take-move(-1, -1) repeat(1);");
-        
-        // 3. 볼트 (번개): 직선으로 3칸까지만
-        StandardGenerators.registerScript("volt",
-            "take-move(1, 0) repeat(3); take-move(-1, 0) repeat(3); " +
-            "take-move(0, 1) repeat(3); take-move(0, -1) repeat(3);");
-    }
-    
-    static GameState createCustomGame() {
-        GameState state = GameState.newDefault();
-        
-        // 커스텀 포켓 설정
-        List<Piece.PieceSpec> pocket = Arrays.asList(
-            new Piece.PieceSpec(Piece.PieceKind.CUSTOM), // Warrior
-            new Piece.PieceSpec(Piece.PieceKind.CUSTOM), // Aqua
-            new Piece.PieceSpec(Piece.PieceKind.CUSTOM)  // Volt
-        );
-        
-        state.setupPocketUnchecked(0, pocket);
-        state.setupPocketUnchecked(1, pocket);
-        
-        return state;
-    }
-    
-    static void playGame(GameState state) {
-        // 게임 로직...
-    }
-}
-```
-
-### 예제 2: 이동 힌트 시스템
+### 예제 1: 이동 힌트 시스템
 
 ```java
 public class MoveHintSystem {
@@ -505,7 +325,7 @@ public class MoveHintSystem {
 }
 ```
 
-### 예제 3: 디버그 모드로 행마법 검증
+### 예제 2: 디버그 모드로 행마법 검증
 
 ```java
 public class ChessemblyDebugger {
@@ -600,5 +420,4 @@ public List<Move.LegalMove> generateMovesParallel(
 
 ## 다음 단계
 
-- [Chessembly DSL API](03-chessembly-dsl-api.md) - 직접 스크립트 작성하기
 - [Minecraft Integration API](04-minecraft-integration-api.md) - 고수준 API 사용하기

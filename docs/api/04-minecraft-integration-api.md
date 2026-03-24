@@ -9,6 +9,7 @@ Minecraft Fabric 모드와의 통합을 위한 고수준 API 문서입니다. `C
 - [Minecraft 통합 예제](#minecraft-통합-예제)
 - [멀티플레이어 지원](#멀티플레이어-지원)
 - [GUI 통합](#gui-통합)
+- [성능 최적화](#성능-최적화)
 
 ---
 
@@ -19,17 +20,15 @@ Minecraft Fabric 모드와의 통합을 위한 고수준 API 문서입니다. `C
 - **Pure Java**: Minecraft 코드 의존성 없음
 - **간단한 API**: 복잡한 내부 로직 숨김
 - **멀티 게임**: 여러 게임 동시 관리
-- **DSL 지원**: 커스텀 기물 로드
 
 ### 사용 흐름
 
 ```
 1. ChessStackEngine 인스턴스 생성
 2. createGame() → 게임 ID 받기
-3. (선택) loadDSLPiece() - 커스텀 기물 등록
-4. getLegalMoves() / makeMove() / placePiece()
-5. endTurn() - 턴 종료
-6. getGameResult() - 승리 확인
+3. getLegalMoves() / makeMove() / placePiece()
+4. endTurn() - 턴 종료
+5. getGameResult() - 승리 확인
 ```
 
 ---
@@ -86,41 +85,6 @@ GameState customState = GameState.newDefault();
 // ... 커스텀 설정
 
 String gameId = engine.registerGame(customState);
-```
-
----
-
-## DSL 기물 로드
-
-### loadDSLPiece()
-
-커스텀 Chessembly 기물을 등록합니다.
-
-```java
-String script = "take-move(1, 0) repeat(2); take-move(0, 1) repeat(2);";
-engine.loadDSLPiece("custompiece", script);
-```
-
-**파라미터**:
-- `pieceName`: 기물 이름 (소문자)
-- `script`: Chessembly 스크립트
-
-### loadDSLPieces()
-
-여러 기물을 한번에 등록합니다.
-
-```java
-Map<String, String> pieces = new HashMap<>();
-
-pieces.put("spider", 
-    "take-move(1, 1); take-move(-1, 1); " +
-    "take-move(1, -1); take-move(-1, -1);");
-
-pieces.put("dragon",
-    "take-move(2, 0); take-move(0, 2); " +
-    "take-move(1, 1) repeat(1);");
-
-engine.loadDSLPieces(pieces);
 ```
 
 ---
@@ -442,21 +406,6 @@ public class ChessGameManager {
     public ChessGameManager() {
         this.engine = new ChessStackEngine();
         this.playerGames = new HashMap<>();
-        
-        // 커스텀 기물 등록
-        loadCustomPieces();
-    }
-    
-    private void loadCustomPieces() {
-        Map<String, String> custom = new HashMap<>();
-        
-        custom.put("enderpawn",
-            "move(0, 2); take(1, 2); take(-1, 2);");
-        
-        custom.put("blazeknight",
-            "take-move(1, 2) repeat(2); take-move(2, 1) repeat(2);");
-        
-        engine.loadDSLPieces(custom);
     }
     
     /**
@@ -775,58 +724,6 @@ public class ChessBoardRenderer {
 
 ---
 
-## 실전 예제: 완전한 Fabric 모드
-
-```java
-// FabricBridgeExample.java 참고
-package com.chesstack.minecraft.api;
-
-public class FabricBridgeExample {
-    
-    /**
-     * Fabric 모드 초기화 예제
-     */
-    public static void initialize() {
-        ChessStackEngine engine = new ChessStackEngine();
-        
-        // 1. 커스텀 기물 로드
-        loadMinecraftPieces(engine);
-        
-        // 2. 커맨드 등록
-        registerCommands(engine);
-        
-        // 3. 이벤트 핸들러
-        registerEventHandlers(engine);
-    }
-    
-    private static void loadMinecraftPieces(ChessStackEngine engine) {
-        Map<String, String> pieces = new HashMap<>();
-        
-        // 엔더맨 폰 (2칸 전진 + 텔레포트)
-        pieces.put("enderpawn",
-            "move(0, 1); move(0, 2); take(1, 1); take(-1, 1); " +
-            "take-move(3, 0); take-move(-3, 0);");
-        
-        // 블레이즈 나이트 (나이트 + 화염)
-        pieces.put("blazeknight",
-            "take-move(1, 2); take-move(2, 1); " +
-            "take(1, 0); take(-1, 0); take(0, 1); take(0, -1);");
-        
-        engine.loadDSLPieces(pieces);
-    }
-    
-    private static void registerCommands(ChessStackEngine engine) {
-        // Fabric 커맨드 등록 로직
-    }
-    
-    private static void registerEventHandlers(ChessStackEngine engine) {
-        // Fabric 이벤트 핸들러 등록
-    }
-}
-```
-
----
-
 ## 성능 최적화
 
 ### 1. 게임 풀링
@@ -903,5 +800,4 @@ public class AsyncChessEngine {
 ## 다음 단계
 
 - [Core API](01-core-api.md) - 저수준 API 이해
-- [Move Generation API](02-move-generation-api.md) - 합법 수 생성 커스터마이징
-- [Chessembly DSL API](03-chessembly-dsl-api.md) - 커스텀 기물 만들기
+- [Move Generation API](02-move-generation-api.md) - 합법 수 생성

@@ -1,8 +1,6 @@
 package nand.modid.comand;
 
 import nand.modid.chess.core.*;
-import nand.modid.chess.dsl.chessembly.*;
-import nand.modid.chess.movegen.*;
 import nand.modid.chess.core.GameState;
 
 import java.util.*;
@@ -13,9 +11,8 @@ import java.util.*;
  *
  * 사용 흐름:
  * 1. createGame()
- * 2. loadDSLPiece() (선택)
- * 3. getLegalMoves() / makeMove() / endTurn()
- * 4. getGameResult()
+ * 2. getLegalMoves() / makeMove() / endTurn()
+ * 3. getGameResult()
  */
 public final class ChessStackEngine {
 
@@ -48,23 +45,6 @@ public final class ChessStackEngine {
         String id = "game_" + nextGameId++;
         games.put(id, state);
         return id;
-    }
-
-    // ── DSL 기물 로드 ─────────────────────────────────
-
-    /**
-     * 커스텀 DSL 기물을 로드한다.
-     *
-     * @param pieceName 기물 이름 (소문자)
-     * @param script    Chessembly 스크립트
-     */
-    public void loadDSLPiece(String pieceName, String script) {
-        StandardGenerators.registerScript(pieceName, script);
-    }
-
-    /** 여러 커스텀 기물을 한번에 등록 */
-    public void loadDSLPieces(Map<String, String> nameToScript) {
-        nameToScript.forEach(StandardGenerators::registerScript);
     }
 
     // ── 이동 ──────────────────────────────────────────

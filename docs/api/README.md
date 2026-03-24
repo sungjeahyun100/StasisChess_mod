@@ -25,7 +25,7 @@ ChessStack Java API의 완전한 사용 가이드입니다.
    - StandardGenerators - 기본 행마법 관리
    - 고급 사용법 및 필터링
 
-3. **[Chessembly DSL API](03-chessembly-dsl-api.md)** - DSL 직접 사용
+3. **[Chessembly DSL 내부 참조](03-chessembly-dsl-api.md)** - 내부 구현 참조
    - Interpreter - 스크립트 실행
    - Parser - 스크립트 파싱
    - AST - 추상 구문 트리
@@ -77,9 +77,8 @@ System.out.println("게임 상태: " + engine.getGameResult(gameId));
 |------|----------|
 | **빠르게 시작하고 싶어요** | [Quick Start](00-quick-start.md) |
 | **기본 구조를 이해하고 싶어요** | [Core API](01-core-api.md) |
-| **커스텀 기물을 만들고 싶어요** | [Chessembly DSL](03-chessembly-dsl-api.md) |
 | **Minecraft에 통합하고 싶어요** | [Minecraft Integration](04-minecraft-integration-api.md) |
-| **합법 수 생성을 커스터마이징하고 싶어요** | [Move Generation](02-move-generation-api.md) |
+| **합법 수 생성을 이해하고 싶어요** | [Move Generation](02-move-generation-api.md) |
 
 ### 🎓 학습 경로
 
@@ -167,7 +166,6 @@ List<AST.Activation> activations = interpreter.execute(board);
 - **[Quick Start - 시나리오별 예제](00-quick-start.md#사용-시나리오별-예제)**
   - 2인 게임
   - 합법 수 표시
-  - 커스텀 기물
   - 간단한 AI
   - 게임 저장/로드
 
@@ -177,15 +175,8 @@ List<AST.Activation> activations = interpreter.execute(board);
   - 플레이어 입력 처리
 
 - **[Move Generation - 실전 예제](02-move-generation-api.md#실전-예제)**
-  - 커스텀 체스 변형
   - 이동 힌트 시스템
   - 디버그 도구
-
-- **[Chessembly DSL - 실전 예제](03-chessembly-dsl-api.md#실전-예제)**
-  - 커스텀 기물 정의
-  - 조건부 이동
-  - 복잡한 패턴
-  - 시각화 도구
 
 - **[Minecraft Integration - 예제](04-minecraft-integration-api.md#minecraft-통합-예제)**
   - Fabric 모드 통합
@@ -228,8 +219,7 @@ src/main/java/com/chesstack/
 │           └── BuiltinOps.java
 └── minecraft/
     └── api/               # Minecraft 통합
-        ├── ChessStackEngine.java
-        └── FabricBridgeExample.java
+        └── ChessStackEngine.java
 ```
 
 ## 🔗 관련 문서
